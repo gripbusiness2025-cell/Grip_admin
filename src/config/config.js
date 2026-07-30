@@ -15,6 +15,7 @@ const config = {
   }
 };
 
+
 export default config[environment];
 
 // Log config for debugging
