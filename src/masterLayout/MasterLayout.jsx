@@ -522,8 +522,15 @@ const MasterLayout = ({ children }) => {
                     </NavLink>
                   </li>
                   )}
+                  <li>
+                    <NavLink to="/visitor-feedback" className={(navData) => navData.isActive ? "active-page" : "" }>
+                      <Icon icon="mdi:comment-text-multiple-outline" className="menu-icon" />
+                      Visitor Feedback
+                    </NavLink>
+                  </li>
                 </ul>
               </li>
+
             )}
             {/* Invoice Dropdown */}
             {hasPermission("associates-list") && (

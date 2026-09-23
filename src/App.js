@@ -139,6 +139,9 @@ import OnboardingListPage from "./pages/OnboardingListPage";
 import WebsitePage from "./pages/WebsitePage";
 import WebsiteEditPage from "./pages/WebsiteEditPage";
 import WebsiteEventsPage from "./pages/WebsiteEventsPage";
+import VisitorFeedbackPage from "./pages/VisitorFeedbackPage";
+import VisitorFeedbackListPage from "./pages/VisitorFeedbackListPage";
+
 
 function App() {
   // Initialize auth state from sessionStorage so we know the value during the first render
@@ -312,6 +315,8 @@ function App() {
 
           <Route exact path="/visitor" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="visitor-guest-list"><VisitorOverallpage /></ProtectedRoute>} />
           <Route exact path="/visitor-analytics/:chapterId?" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="visitor-guest-list"><VisitorAnalyticsPage /></ProtectedRoute>} />
+          <Route exact path="/visitor-feedback" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="visitor-guest-list"><VisitorFeedbackPage /></ProtectedRoute>} />
+          <Route exact path="/visitor-feedback-list/:id?" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="visitor-guest-list"><VisitorFeedbackListPage /></ProtectedRoute>} />
           
           <Route exact path="/expected-visitors" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="expected-visitors-list"><ExpectedVisitorsOverallPage /></ProtectedRoute>} />
           <Route exact path="/expected-visitors-analytics/:chapterId?" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="expected-visitors-list"><ExpectedVisitorsAnalyticsPage /></ProtectedRoute>} />
@@ -321,6 +326,7 @@ function App() {
             path="/expected-visitors/:chapterId"
             element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="expected-visitors-list"><ExpectedVisitorsListPage /></ProtectedRoute>}
           />
+
 
           <Route
             exact

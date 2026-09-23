@@ -158,8 +158,6 @@ const VisitorsListLayer = () => {
                         {/* Who invited */}
                         <td>{inviterName}</td>
 
-
-
                         <td>
                           {hasDeletePermission("visitor-guest-delete") && (
                             <button
@@ -183,6 +181,8 @@ const VisitorsListLayer = () => {
                 )}
               </tbody>
             </table>
+
+
           </div>
 
           {/* Pagination */}

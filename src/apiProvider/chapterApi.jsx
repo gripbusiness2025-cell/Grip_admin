@@ -506,23 +506,25 @@ class ChapterApiProvider {
 
     async visitorsSlipList(input) {
         try {
-            const response = await apiClient.get('/visitors/list');
+            const response = await apiClient.get('/visitors/list', { params: input });
 
             if (response.status === 200 || response.status === 201) {
                 return { status: true, response: response.data };
             } else {
-                console.error("Failed to fetch categories:", response.data?.message ?? "Something went wrong");
+                console.error("Failed to fetch visitor feedback list:", response.data?.message ?? "Something went wrong");
                 return { status: false, response: response.data };
             }
         } catch (error) {
-            console.error("Error fetching visitors slip list:", error);
+            // apiClient interceptor transforms axios errors into { status, data, message }
+            const httpStatus = error?.status;
+            const errorMessage = error?.message || error?.data?.message || 'Unknown error';
+            console.error("Error fetching visitors slip list:", httpStatus, errorMessage);
 
-            if (error.response && error.response.status === 401) {
-                console.error("Unauthorized access - check your token.");
-                console.error("Error Response:", error.response.data);
+            if (httpStatus === 401) {
+                console.error("Unauthorized - admin token expired or invalid. Please re-login.");
             }
 
-            return { status: false, response: error.response?.data ?? null };
+            return { status: false, response: error?.data ?? null, httpStatus };
         }
     }
 
@@ -936,6 +938,64 @@ async submitHeadTableRoles(chapterId, payload) {
         } catch (error) {
             console.error("Error fetching associate performance report:", error);
             return { success: false, data: [], total: 0 };
+        }
+    }
+
+    // ─── Visitor Feedback (separate collection) ───────────────────────────
+
+    async visitorFeedbackList(input) {
+        try {
+            const response = await apiClient.get('/visitor-feedbacks/list', { params: input });
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                console.error('Failed to fetch visitor feedback list:', response.data?.message ?? 'Something went wrong');
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            const httpStatus = error?.status;
+            const errorMessage = error?.message || error?.data?.message || 'Unknown error';
+            console.error('Error fetching visitor feedback list:', httpStatus, errorMessage);
+            if (httpStatus === 401) {
+                console.error('Unauthorized - admin token expired or invalid.');
+            }
+            return { status: false, response: error?.data ?? null, httpStatus };
+        }
+    }
+
+    async visitorFeedbackListMember(id, query) {
+        try {
+            const response = await apiClient.get(`/visitor-feedbacks/member/list/${id}`, {
+                params: query,
+            });
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                console.error('Failed to fetch visitor feedback by chapter:', response.data?.message ?? 'Something went wrong');
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error('Error fetching visitor feedback by chapter:', error);
+            return { status: false, response: error?.data ?? null, httpStatus: error?.status };
+        }
+    }
+
+    async deleteVisitorFeedbackById(feedbackId) {
+        try {
+            console.log('Deleting Visitor Feedback ID:', feedbackId);
+            const response = await apiClient.patch(`/visitor-feedbacks/delete/${feedbackId}`);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                console.error('Failed to delete Visitor Feedback record:', response.data?.message ?? 'Something went wrong');
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error('Error deleting Visitor Feedback record:', error);
+            if (error.response && error.response.status === 401) {
+                console.error('Unauthorized access - check your token.');
+            }
+            return { status: false, response: error.response?.data ?? null };
         }
     }
 }
