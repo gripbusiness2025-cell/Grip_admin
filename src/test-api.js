@@ -13,7 +13,7 @@ const req = http.request(options, res => {
   res.on('end', () => {
     try {
       console.log(JSON.stringify(JSON.parse(data), null, 2));
-    } catch(e) {
+    } catch (e) {
       console.log(data.slice(0, 500));
     }
   });
@@ -22,5 +22,7 @@ const req = http.request(options, res => {
 req.on('error', error => {
   console.error(error);
 });
-
+req.on('error', error => {
+  console.error(error);
+});
 req.end();
