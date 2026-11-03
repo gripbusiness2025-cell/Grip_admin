@@ -340,12 +340,99 @@ const ChapterViewLayer = () => {
   const [testimonialCounts, setTestimonialCounts] = useState({});
   const [search, setSearch] = useState("");
   const [associatePerformance, setAssociatePerformance] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
 
+
+  const [palmsPeriod, setPalmsPeriod] = useState("overall");
+  const [loadingPalms, setLoadingPalms] = useState(false);
+
+  const PALMS_PERIOD_OPTIONS = [
+    { key: "weekly", label: "Weekly" },
+    { key: "monthly", label: "Monthly" },
+    { key: "3months", label: "3 Months" },
+    { key: "6months", label: "6 Months" },
+    { key: "yearly", label: "Yearly" },
+    { key: "overall", label: "Overall" },
+  ];
+
+  const getDateRangeForPeriod = (period) => {
+    const now = new Date();
+    if (period === "weekly") {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    if (period === "monthly") {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    if (period === "3months") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 2, 1, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    if (period === "6months") {
+      const start = new Date(now.getFullYear(), now.getMonth() - 5, 1, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    if (period === "yearly") {
+      const start = new Date(now.getFullYear() - 1, now.getMonth() + 1, 1, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    // "overall"
+    return { startDate: undefined, endDate: undefined };
+  };
+
+
+
+  const fetchPalmsCounts = async (membersList, period) => {
+    if (!membersList || membersList.length === 0) return;
+    setLoadingPalms(true);
+    try {
+      const dateFilter = getDateRangeForPeriod(period);
+      const memberIds = membersList.map((m) => m._id);
+
+      const [
+        attendanceRes,
+        oneToOneRes,
+        referralRes,
+        thankYouRes,
+        visitorRes,
+        testimonialRes,
+      ] = await Promise.all([
+        chapterApiProvider.getMembersAttendanceCount(membersList, dateFilter),
+        chapterApiProvider.getOneToOneCounts(memberIds, dateFilter),
+        chapterApiProvider.getReferralCounts(memberIds, dateFilter),
+        chapterApiProvider.getThankYouSlipAmounts(memberIds, dateFilter),
+        chapterApiProvider.getVisitorCounts(memberIds, dateFilter),
+        chapterApiProvider.getTestimonialCounts(memberIds, dateFilter),
+      ]);
+
+      if (attendanceRes?.success) setAttendanceCounts(attendanceRes.data);
+      if (oneToOneRes?.success) setOneToOneCounts(oneToOneRes.data);
+      if (referralRes?.success) setReferralCounts(referralRes.data);
+      if (thankYouRes?.success) setThankYouAmounts(thankYouRes.data);
+      if (visitorRes?.success) setVisitorCounts(visitorRes.data);
+      if (testimonialRes?.success) setTestimonialCounts(testimonialRes.data);
+    } catch (error) {
+      console.error("Error fetching PALMS counts:", error);
+    } finally {
+      setLoadingPalms(false);
+    }
+  };
 
   // ---------------- USE EFFECT ----------------
   useEffect(() => {
     if (id) {
       fetchMembersWithAttendance(id);
+    } else {
+      setLoadingReports(false);
     }
   }, [id, search, pagination.page, pagination.limit]);
 
@@ -369,14 +456,13 @@ const ChapterViewLayer = () => {
 
   // ---------------- MAIN FUNCTION ----------------
   const fetchMembersWithAttendance = async (chapterId) => {
+    setLoadingReports(true);
     try {
       const params = {
         page: pagination.page,
         limit: pagination.limit,
         search: search.trim() || undefined,
       };
-
-
 
       // 1. FETCH MEMBERS
       const response = await memberApiProvider.getMemberByChapterId(params, chapterId);
@@ -413,8 +499,9 @@ const ChapterViewLayer = () => {
       }
 
       const memberIds = fetchedMembers.map((m) => m._id);
+      const dateFilter = getDateRangeForPeriod(palmsPeriod);
 
-      // 2. PARALLEL FETCH
+      // 2. PARALLEL FETCH (all PALMS counts + performance report in parallel)
       const [
         attendanceRes,
         oneToOneRes,
@@ -424,17 +511,16 @@ const ChapterViewLayer = () => {
         testimonialRes,
         associatePerformanceRes,
       ] = await Promise.all([
-        chapterApiProvider.getMembersAttendanceCount(fetchedMembers),
-        chapterApiProvider.getOneToOneCounts(memberIds),
-        chapterApiProvider.getReferralCounts(memberIds),
-        chapterApiProvider.getThankYouSlipAmounts(memberIds),
-        chapterApiProvider.getVisitorCounts(memberIds),
-        chapterApiProvider.getTestimonialCounts(memberIds),
+        chapterApiProvider.getMembersAttendanceCount(fetchedMembers, dateFilter),
+        chapterApiProvider.getOneToOneCounts(memberIds, dateFilter),
+        chapterApiProvider.getReferralCounts(memberIds, dateFilter),
+        chapterApiProvider.getThankYouSlipAmounts(memberIds, dateFilter),
+        chapterApiProvider.getVisitorCounts(memberIds, dateFilter),
+        chapterApiProvider.getTestimonialCounts(memberIds, dateFilter),
 
         // Associate performance report paginated
         chapterApiProvider.getAssociatePerformanceReport(memberIds, params),
       ]);
-
 
       // 3. SET PALMS STATES
       if (attendanceRes?.success) setAttendanceCounts(attendanceRes.data);
@@ -451,6 +537,8 @@ const ChapterViewLayer = () => {
       }
     } catch (error) {
       console.error("Error fetching members and reports:", error);
+    } finally {
+      setLoadingReports(false);
     }
   };
 
@@ -821,7 +909,25 @@ const ChapterViewLayer = () => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
-  console.log(chapterData, "chapterData");
+  // Helper to resolve Top Achiever profile image with fallback
+  const getTopAchieverImageUrl = (member) => {
+    const img = member?.image;
+    if (img && typeof img === 'object' && img.docPath && img.docName) {
+      return `${IMAGE_BASE_URL}/${img.docPath}/${img.docName}`;
+    }
+    if (typeof img === 'string' && img.trim() && !img.includes('default-user') && !img.includes('user.png')) {
+      if (img.startsWith('http') || img.startsWith('/')) return img;
+      return `${IMAGE_BASE_URL}/${img}`;
+    }
+    const found = allMembers?.find(
+      (m) => String(m.id || m._id) === String(member?.id)
+    );
+    if (found?.profileImage?.docPath && found?.profileImage?.docName) {
+      return `${IMAGE_BASE_URL}/${found.profileImage.docPath}/${found.profileImage.docName}`;
+    }
+    return '/assets/images/default-avatar.png';
+  };
+
   // Map API data to card format
   const gripChapters = [
     {
@@ -832,7 +938,7 @@ const ChapterViewLayer = () => {
         (receiver) => ({
           id: receiver.memberId,
           name: receiver.name,
-          image: receiver.profileImage?.docName || "default-user.png",
+          image: receiver.profileImage,
           score: receiver.count,
         })
       ),
@@ -845,7 +951,7 @@ const ChapterViewLayer = () => {
         (member) => ({
           id: member.memberId,
           name: member.name,
-          image: member.profileImage?.docName || "default-user.png",
+          image: member.profileImage,
           score: member.count,
         })
       ),
@@ -854,13 +960,11 @@ const ChapterViewLayer = () => {
       id: "referrals",
       name: "Top Referrals",
       memberCount: topAchieversData?.referralSlips?.totalCount,
-      members: topAchieversData?.referralSlips?.topReceivers.map(
+      members: topAchieversData?.referralSlips?.topReceivers?.map(
         (receiver) => ({
           id: receiver.memberId,
           name: receiver.name,
-          image: receiver.profileImage
-            ? receiver.profileImage
-            : " " || "default-user.png",
+          image: receiver.profileImage,
           score: receiver.count,
         })
       ),
@@ -873,9 +977,7 @@ const ChapterViewLayer = () => {
         (receiver) => ({
           id: receiver.memberId,
           name: receiver.name,
-          image: receiver.profileImage
-            ? receiver.profileImage
-            : "" || "default-user.png",
+          image: receiver.profileImage,
           score: receiver.count || receiver.amount,
         })
       ),
@@ -883,51 +985,75 @@ const ChapterViewLayer = () => {
   ].filter((chapter) => chapter?.members?.length > 0); // Only show categories with data
 
   const renderProfileCard = (memberSelection, roleTitle) => {
-    const themeColor = "rgb(192, 34, 33)";
-    
+    const themeColor = "#c02221";
+
     if (!memberSelection) {
       return (
         <div 
-          className="card h-100 border-dashed d-flex align-items-center justify-content-center p-4 cursor-pointer"
-          style={{ backgroundColor: "#fff", borderColor: themeColor, borderRadius: "16px", minHeight: "140px", transition: "all 0.2s ease", borderStyle: "dashed", borderWidth: "2px" }}
+          className="card h-100 d-flex flex-column align-items-center justify-content-center p-24 cursor-pointer text-center role-assign-card"
+          style={{ 
+            backgroundColor: "#ffffff", 
+            border: "1.5px dashed #cbd5e1", 
+            borderRadius: "16px", 
+            minHeight: "148px", 
+            transition: "all 0.25s ease",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.02)"
+          }}
           data-bs-toggle="modal" 
           data-bs-target="#memberSelectionModal"
           onClick={() => setRoleModalTarget(roleTitle)}
         >
-          <div className="d-flex flex-column align-items-center" style={{ color: themeColor }}>
-            <span className="fw-bold text-md">+ Assign {roleTitle}</span>
+          <div 
+            className="w-44-px h-44-px rounded-circle d-flex align-items-center justify-content-center mb-2 role-icon-circle transition-all"
+            style={{ backgroundColor: "rgba(192, 34, 33, 0.08)", color: themeColor }}
+          >
+            <Icon icon="solar:user-plus-bold" style={{ fontSize: "22px" }} />
           </div>
+          <span className="fw-bold mb-1" style={{ fontSize: "14px", color: "#0f172a" }}>+ Assign {roleTitle}</span>
+          <span style={{ fontSize: "12px", color: "#64748b" }}>Click to select member</span>
         </div>
       );
     }
 
     const memberObj = members.find((m) => m.id === memberSelection.value);
-    
+
     return (
       <div 
-        className="card h-100 border-0 p-3 position-relative" 
+        className="card h-100 border-0 p-20 position-relative role-filled-card" 
         style={{ 
-          backgroundColor: "#fff", 
+          backgroundColor: "#ffffff", 
           borderRadius: "16px", 
-          boxShadow: "0 4px 12px rgba(0,0,0,0.03)", 
-          border: `1px solid ${themeColor}` 
+          boxShadow: "0 4px 16px rgba(0,0,0,0.04)", 
+          border: "1px solid #e2e8f0",
+          minHeight: "148px",
+          overflow: "hidden",
+          transition: "all 0.25s ease"
         }}
       >
         <button 
-          className="btn btn-sm position-absolute top-0 end-0 m-3 d-flex align-items-center justify-content-center p-1"
+          className="btn btn-sm position-absolute top-0 end-0 m-3 d-flex align-items-center gap-1 px-10 py-4 rounded-pill role-edit-btn"
           data-bs-toggle="modal" 
           data-bs-target="#memberSelectionModal"
           onClick={() => setRoleModalTarget(roleTitle)}
-          style={{ zIndex: 10, border: "none", backgroundColor: "transparent", color: themeColor, fontSize: "14px", fontWeight: "bold", textDecoration: "underline" }}
+          style={{ 
+            zIndex: 10, 
+            backgroundColor: "#f8fafc", 
+            color: "#475569", 
+            fontSize: "12px", 
+            fontWeight: "600",
+            border: "1px solid #e2e8f0",
+            transition: "all 0.2s ease"
+          }}
         >
+          <Icon icon="solar:pen-bold" style={{ fontSize: "12px" }} />
           Edit
         </button>
 
-        <div className="d-flex align-items-center gap-3 mt-2">
-          <div className="position-relative" style={{ width: "56px", height: "56px", minWidth: "56px" }}>
+        <div className="d-flex align-items-center gap-3 w-100" style={{ minWidth: 0, overflow: "hidden" }}>
+          <div className="position-relative flex-shrink-0" style={{ width: "52px", height: "52px" }}>
             <div 
-              className="d-flex align-items-center justify-content-center rounded-circle shadow-sm fw-bold text-white fs-5 position-absolute w-100 h-100"
-              style={{ backgroundColor: themeColor, top: 0, left: 0 }}
+              className="d-flex align-items-center justify-content-center rounded-circle shadow-sm fw-bold text-white fs-5 w-100 h-100"
+              style={{ background: "linear-gradient(135deg, #c02221 0%, #454442 100%)" }}
             >
               {memberSelection.label ? memberSelection.label.charAt(0).toUpperCase() : "?"}
             </div>
@@ -935,25 +1061,63 @@ const ChapterViewLayer = () => {
               <img 
                 src={`${IMAGE_BASE_URL}/${memberObj.profileImage.docPath}/${memberObj.profileImage.docName}`} 
                 alt="" 
-                className="rounded-circle object-fit-cover shadow-sm position-absolute w-100 h-100"
-                style={{ border: `2px solid ${themeColor}`, top: 0, left: 0 }}
+                className="rounded-circle object-fit-cover shadow-sm position-absolute top-0 start-0 w-100 h-100"
+                style={{ border: "2px solid #fff" }}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
             )}
           </div>
 
-          <div className="flex-grow-1 min-w-0" style={{ paddingRight: "40px" }}>
+          <div className="flex-grow-1" style={{ minWidth: 0, paddingRight: "64px", overflow: "hidden" }}>
             <span 
-              className="badge mb-2 radius-4 px-2 py-1 fw-semibold text-xs"
-              style={{ backgroundColor: "rgba(192, 34, 33, 0.1)", color: themeColor }}
+              className="badge rounded-pill mb-2 px-10 py-4 fw-semibold"
+              style={{ 
+                backgroundColor: "rgba(192, 34, 33, 0.08)", 
+                color: themeColor,
+                border: "1px solid rgba(192, 34, 33, 0.15)",
+                fontSize: "11px",
+                display: "inline-block",
+                maxWidth: "100%",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap"
+              }}
             >
               {roleTitle}
             </span>
-            <h6 className="mb-1 fw-bold text-dark text-md text-truncate">
+            <h6 
+              className="mb-1 fw-bold text-truncate" 
+              title={memberSelection.label}
+              style={{ 
+                color: "#0f172a", 
+                fontSize: "15px", 
+                fontWeight: 700, 
+                lineHeight: "1.3",
+                margin: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                display: "block",
+                maxWidth: "100%"
+              }}
+            >
               {memberSelection.label}
             </h6>
-            <div className="d-flex align-items-center gap-1 text-xs text-truncate" style={{ color: "#64748b" }}>
-              <span className="text-truncate">{memberObj?.companyName || "N/A"}</span>
+            <div 
+              className="d-flex align-items-center gap-1"
+              title={memberObj?.companyName || "N/A"}
+              style={{ fontSize: "12px", color: "#64748b", minWidth: 0, overflow: "hidden" }}
+            >
+              <Icon icon="solar:buildings-2-linear" style={{ fontSize: "13px", flexShrink: 0 }} />
+              <span style={{ 
+                whiteSpace: "nowrap", 
+                overflow: "hidden", 
+                textOverflow: "ellipsis", 
+                display: "inline-block", 
+                maxWidth: "100%" 
+              }}>
+                {memberObj?.companyName || "N/A"}
+              </span>
             </div>
           </div>
         </div>
@@ -962,29 +1126,63 @@ const ChapterViewLayer = () => {
   };
 
   const renderMemberCards = (selectedMembers, setMembersFunction, roleTitle) => {
-    const themeColor = "rgb(192, 34, 33)";
+    const themeColor = "#c02221";
+
+    const getRoleBadgeStyle = (title) => {
+      switch (title) {
+        case "Associate Committee":
+          return { bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0" };
+        case "Coordinator":
+          return { bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe" };
+        case "Visitor Interaction Team":
+          return { bg: "#faf5ff", color: "#7c3aed", border: "#e9d5ff" };
+        default:
+          return { bg: "rgba(192, 34, 33, 0.08)", color: themeColor, border: "rgba(192, 34, 33, 0.15)" };
+      }
+    };
+
+    const badgeStyle = getRoleBadgeStyle(roleTitle);
+
     return (
       <div className="row g-3">
         {selectedMembers.map((m) => {
           const memberObj = members.find((obj) => obj.id === m.value);
           return (
-            <div className="col-xl-6 col-md-12 col-sm-6" key={m.value}>
+            <div className="col-xxl-3 col-xl-4 col-md-6 col-12" key={m.value}>
               <div 
-                className="card border-0 p-3 position-relative shadow-sm"
-                style={{ backgroundColor: "#fff", borderRadius: "12px", border: `1px solid ${themeColor}` }}
+                className="card border-0 p-3 position-relative shadow-sm h-100 team-member-card"
+                style={{ 
+                  backgroundColor: "#ffffff", 
+                  borderRadius: "14px", 
+                  border: "1px solid #eef2f6",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+                  minHeight: "84px",
+                  overflow: "hidden",
+                  transition: "all 0.2s ease"
+                }}
               >
-                <span 
-                  className="position-absolute top-0 end-0 m-2 cursor-pointer fw-bold" 
-                  style={{ color: themeColor, fontSize: "18px", lineHeight: "1" }}
+                <button 
+                  type="button"
+                  className="btn btn-sm p-0 d-flex align-items-center justify-content-center rounded-circle position-absolute top-0 end-0 m-2 team-remove-btn" 
+                  style={{ 
+                    width: "24px", 
+                    height: "24px", 
+                    backgroundColor: "#f8fafc", 
+                    color: "#94a3b8", 
+                    border: "1px solid #e2e8f0",
+                    transition: "all 0.2s ease" 
+                  }}
                   onClick={() => setMembersFunction(prev => prev.filter(item => item.value !== m.value))}
+                  title="Remove member"
                 >
-                  ×
-                </span>
-                <div className="d-flex align-items-center gap-3">
-                  <div className="position-relative" style={{ width: "40px", height: "40px", minWidth: "40px" }}>
+                  <Icon icon="solar:close-circle-bold" style={{ fontSize: "16px" }} />
+                </button>
+
+                <div className="d-flex align-items-center gap-3 w-100" style={{ minWidth: 0, overflow: "hidden" }}>
+                  <div className="position-relative flex-shrink-0" style={{ width: "44px", height: "44px" }}>
                     <div 
-                      className="d-flex align-items-center justify-content-center rounded-circle shadow-sm fw-bold text-white fs-6 position-absolute w-100 h-100"
-                      style={{ backgroundColor: themeColor, top: 0, left: 0 }}
+                      className="d-flex align-items-center justify-content-center rounded-circle shadow-sm fw-bold text-white fs-6 w-100 h-100"
+                      style={{ background: "linear-gradient(135deg, #c02221 0%, #454442 100%)" }}
                     >
                       {m.label ? m.label.charAt(0).toUpperCase() : "?"}
                     </div>
@@ -992,20 +1190,64 @@ const ChapterViewLayer = () => {
                       <img 
                         src={`${IMAGE_BASE_URL}/${memberObj.profileImage.docPath}/${memberObj.profileImage.docName}`} 
                         alt="" 
-                        className="rounded-circle object-fit-cover shadow-sm position-absolute w-100 h-100"
-                        style={{ border: `1px solid ${themeColor}`, top: 0, left: 0 }}
+                        className="rounded-circle object-fit-cover shadow-sm position-absolute top-0 start-0 w-100 h-100"
+                        style={{ border: "2px solid #fff" }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
                     )}
                   </div>
-                  <div className="flex-grow-1 min-w-0" style={{ paddingRight: "16px" }}>
-                    <h6 className="mb-0 fw-bold text-dark text-sm text-truncate">
+                  <div className="flex-grow-1" style={{ minWidth: 0, paddingRight: "28px", overflow: "hidden" }}>
+                    <h6 
+                      className="mb-1 fw-bold text-truncate" 
+                      title={m.label}
+                      style={{ 
+                        color: "#0f172a", 
+                        fontSize: "14px", 
+                        fontWeight: 700, 
+                        lineHeight: "1.3",
+                        margin: 0,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "block",
+                        maxWidth: "100%"
+                      }}
+                    >
                       {m.label}
                     </h6>
-                    <span className="text-xs fw-medium" style={{ color: themeColor }}>{roleTitle}</span>
+                    <span 
+                      className="badge rounded-pill fw-semibold mb-1" 
+                      style={{ 
+                        backgroundColor: badgeStyle.bg, 
+                        color: badgeStyle.color, 
+                        border: `1px solid ${badgeStyle.border}`,
+                        fontSize: "11px",
+                        padding: "2px 8px",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "inline-block",
+                        maxWidth: "100%"
+                      }}
+                    >
+                      {roleTitle}
+                    </span>
                     {memberObj?.contactDetails?.email && (
-                      <div className="text-xs text-truncate mt-1" style={{ color: "#64748b" }}>
-                        {memberObj.contactDetails.email}
+                      <div 
+                        className="d-flex align-items-center gap-1" 
+                        title={memberObj.contactDetails.email}
+                        style={{ fontSize: "12px", color: "#64748b", minWidth: 0, overflow: "hidden" }}
+                      >
+                        <Icon icon="solar:letter-linear" style={{ fontSize: "12px", flexShrink: 0 }} />
+                        <span style={{ 
+                          whiteSpace: "nowrap", 
+                          overflow: "hidden", 
+                          textOverflow: "ellipsis", 
+                          display: "inline-block",
+                          maxWidth: "100%" 
+                        }}>
+                          {memberObj.contactDetails.email}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -1015,16 +1257,29 @@ const ChapterViewLayer = () => {
           );
         })}
         
-        <div className="col-xl-6 col-md-12 col-sm-6">
+        <div className="col-xxl-3 col-xl-4 col-md-6 col-12">
           <div 
-            className="card h-100 border-dashed d-flex align-items-center justify-content-center p-3 cursor-pointer shadow-sm"
-            style={{ backgroundColor: "#fff", borderColor: themeColor, borderRadius: "12px", minHeight: "74px", transition: "all 0.2s ease", borderStyle: "dashed", borderWidth: "2px" }}
+            className="card h-100 d-flex align-items-center justify-content-center p-3 cursor-pointer team-add-card"
+            style={{ 
+              backgroundColor: "#ffffff", 
+              border: "1.5px dashed #cbd5e1", 
+              borderRadius: "14px", 
+              minHeight: "84px", 
+              transition: "all 0.25s ease",
+              boxShadow: "0 2px 6px rgba(0,0,0,0.02)"
+            }}
             data-bs-toggle="modal" 
             data-bs-target="#memberSelectionModal"
             onClick={() => setRoleModalTarget(roleTitle)}
           >
             <div className="d-flex align-items-center gap-2">
-              <span className="fw-bold text-sm" style={{ color: themeColor }}>
+              <div 
+                className="w-32-px h-32-px rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                style={{ backgroundColor: "rgba(192, 34, 33, 0.08)", color: themeColor }}
+              >
+                <Icon icon="solar:user-plus-bold" style={{ fontSize: "16px" }} />
+              </div>
+              <span className="fw-bold text-sm" style={{ color: "#0f172a" }}>
                 + Add{" "}
                 {roleTitle === "Associate Committee"
                   ? "Committee Member"
@@ -1407,6 +1662,52 @@ const ChapterViewLayer = () => {
         .form-group:focus-within label {
           color: rgb(192, 34, 33) !important;
         }
+        .role-filled-card h6,
+        .team-member-card h6 {
+          font-size: 15px !important;
+          color: #0f172a !important;
+          line-height: 1.3 !important;
+        }
+        .role-filled-card,
+        .team-member-card {
+          overflow: hidden !important;
+        }
+        .role-assign-card:hover {
+          border-color: #c02221 !important;
+          background-color: #fff9f9 !important;
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(192, 34, 33, 0.08) !important;
+        }
+        .role-assign-card:hover .role-icon-circle {
+          transform: scale(1.08);
+          background-color: rgba(192, 34, 33, 0.15) !important;
+        }
+        .role-filled-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06) !important;
+          border-color: rgba(192, 34, 33, 0.3) !important;
+        }
+        .role-edit-btn:hover {
+          background-color: rgba(192, 34, 33, 0.08) !important;
+          color: #c02221 !important;
+          border-color: rgba(192, 34, 33, 0.25) !important;
+        }
+        .team-member-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06) !important;
+          border-color: #cbd5e1 !important;
+        }
+        .team-remove-btn:hover {
+          background-color: #fee2e2 !important;
+          color: #dc2626 !important;
+          border-color: #fca5a5 !important;
+        }
+        .team-add-card:hover {
+          border-color: #c02221 !important;
+          background-color: #fff9f9 !important;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(192, 34, 33, 0.08) !important;
+        }
       `}</style>
 
       {/* Top Achievers of the Month Form - Redesigned */}
@@ -1415,7 +1716,7 @@ const ChapterViewLayer = () => {
         <div className="card-header border-bottom bg-white py-20 px-32 d-flex align-items-center justify-content-between" style={{ borderBottom: "1px solid #e2e8f0", padding: "20px 32px" }}>
           <div className="d-flex align-items-center gap-3">
             <div>
-              <h6 className="text-lg fw-bold mb-1 text-dark" style={{ margin: 0 }}>Top Achievers of the Month</h6>
+              <h6 className="fw-bold mb-1" style={{ fontSize: "18px", color: "#0f172a", margin: 0 }}>Top Achievers of the Month</h6>
               <span className="text-sm fw-medium" style={{ color: "#64748b" }}>Manage top members with maximum contributions.</span>
             </div>
           </div>
@@ -1425,15 +1726,15 @@ const ChapterViewLayer = () => {
           {/* Referrals, Business, Visitors Section */}
           <div className="row g-4 mb-4">
             <div className="col-md-4">
-              <h6 className="fw-bold text-dark mb-3 text-sm">Maximum Referrals Contributed</h6>
+              <h6 className="fw-bold mb-3" style={{ fontSize: "14px", color: "#1e293b" }}>Maximum Referrals Contributed</h6>
               {renderProfileCard(referralMember, "Maximum Referrals")}
             </div>
             <div className="col-md-4">
-              <h6 className="fw-bold text-dark mb-3 text-sm">Maximum Business Contributed</h6>
+              <h6 className="fw-bold mb-3" style={{ fontSize: "14px", color: "#1e293b" }}>Maximum Business Contributed</h6>
               {renderProfileCard(businessMember, "Maximum Business")}
             </div>
             <div className="col-md-4">
-              <h6 className="fw-bold text-dark mb-3 text-sm">Maximum Visitors Invited</h6>
+              <h6 className="fw-bold mb-3" style={{ fontSize: "14px", color: "#1e293b" }}>Maximum Visitors Invited</h6>
               {renderProfileCard(visitorMember, "Maximum Visitors")}
             </div>
           </div>
@@ -1457,65 +1758,108 @@ const ChapterViewLayer = () => {
       {/* Head Table Roles Form - Redesigned */}
       <div className="card h-100 p-0 mb-5 border-0 shadow-sm overflow-hidden" style={{ borderRadius: "16px", backgroundColor: "#F8F9FB", border: "1px solid #e2e8f0" }}>
         {/* Modern Header */}
-        <div className="card-header border-bottom bg-white py-20 px-32 d-flex align-items-center justify-content-between" style={{ borderBottom: "1px solid #e2e8f0", padding: "20px 32px" }}>
+        <div className="card-header border-bottom bg-white py-20 px-32 d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ borderBottom: "1px solid #e2e8f0", padding: "20px 32px" }}>
           <div className="d-flex align-items-center gap-3">
+            <div 
+              className="w-48-px h-48-px rounded-12 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
+              style={{ background: "linear-gradient(135deg, #c02221 0%, #454442 100%)", color: "#fff" }}
+            >
+              <Icon icon="solar:shield-user-bold" style={{ fontSize: "24px" }} />
+            </div>
             <div>
-              <h6 className="text-lg fw-bold mb-1 text-dark" style={{ margin: 0 }}>Head Table Leadership Roles</h6>
+              <h6 className="fw-bold mb-1" style={{ fontSize: "18px", color: "#0f172a", margin: 0 }}>Head Table Leadership Roles</h6>
               <span className="text-sm fw-medium" style={{ color: "#64748b" }}>Manage top-level administrators and coordinators for this chapter.</span>
             </div>
           </div>
         </div>
 
         <div className="card-body p-32" style={{ padding: "32px" }}>
-          {/* President, Secretary, VP Section */}
-          <div className="row g-4 mb-4">
-            <div className="col-md-4">
-              {renderProfileCard(presidentMember, "President")}
-            </div>
-            <div className="col-md-4">
-              {renderProfileCard(secretaryMember, "Secretary")}
-            </div>
-            <div className="col-md-4">
-              {renderProfileCard(vicePresidentMember, "Vice President")}
-            </div>
-          </div>
-
-          <hr style={{ borderColor: "#cbd5e1", margin: "32px 0" }} />
-
-          <div className="row g-4 mb-4">
-            {/* Associate Committee Section */}
-            <div className="col-md-6 border-end pe-4">
-              <div className="h-100">
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <h6 className="fw-bold text-dark mb-0">Associate Committee</h6>
-                </div>
-                {renderMemberCards(associateCommitteeMembers, setAssociateCommitteeMembers, "Associate Committee")}
+          {/* Executive Officers: President, Secretary, VP */}
+          <div className="mb-32">
+            <div className="d-flex align-items-center justify-content-between mb-16">
+              <div className="d-flex align-items-center gap-2">
+                <Icon icon="solar:crown-bold" style={{ fontSize: "18px", color: "#c02221" }} />
+                <h6 className="fw-bold mb-0" style={{ fontSize: "16px", color: "#0f172a" }}>Executive Officers</h6>
               </div>
+              <span className="badge rounded-pill bg-light text-secondary border px-10 py-4 text-xs fw-semibold">Primary Roles</span>
             </div>
-
-            {/* Coordinator Team Section */}
-            <div className="col-md-6 ps-4">
-              <div className="h-100">
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <h6 className="fw-bold text-dark mb-0">Coordinator Team</h6>
-                </div>
-                {renderMemberCards(coordinatorMembers, setCoordinatorMembers, "Coordinator")}
+            <div className="row g-4">
+              <div className="col-lg-4 col-md-6 col-12">
+                {renderProfileCard(presidentMember, "President")}
+              </div>
+              <div className="col-lg-4 col-md-6 col-12">
+                {renderProfileCard(secretaryMember, "Secretary")}
+              </div>
+              <div className="col-lg-4 col-md-6 col-12">
+                {renderProfileCard(vicePresidentMember, "Vice President")}
               </div>
             </div>
           </div>
 
-          <hr style={{ borderColor: "#cbd5e1", margin: "32px 0" }} />
-
-          <div className="row g-4 mb-4">
-            {/* Visitor Interaction Team Section */}
-            <div className="col-md-6">
-              <div className="h-100">
-                <div className="d-flex align-items-center gap-2 mb-3">
-                  <h6 className="fw-bold text-dark mb-0">Visitor Interaction Team</h6>
+          {/* Associate Committee Section */}
+          <div className="p-24 rounded-16 bg-white mb-24 shadow-xs" style={{ border: "1px solid #eef2f6" }}>
+            <div className="d-flex align-items-center justify-content-between mb-16 flex-wrap gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <div 
+                  className="w-36-px h-36-px rounded-10 d-flex align-items-center justify-content-center flex-shrink-0"
+                  style={{ background: "#f0fdf4", color: "#16a34a" }}
+                >
+                  <Icon icon="solar:users-group-rounded-bold" style={{ fontSize: "18px" }} />
                 </div>
-                {renderMemberCards(visitorInteractionMembers, setVisitorInteractionMembers, "Visitor Interaction Team")}
+                <div>
+                  <h6 className="fw-bold mb-0" style={{ fontSize: "15px", color: "#0f172a" }}>Associate Committee</h6>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>Committee members supporting chapter operations and initiatives</span>
+                </div>
               </div>
+              <span className="badge rounded-pill px-10 py-4 text-xs fw-semibold" style={{ background: "#f0fdf4", color: "#16a34a", border: "1px solid #bbf7d0" }}>
+                {associateCommitteeMembers?.length || 0} {(associateCommitteeMembers?.length === 1) ? 'Member' : 'Members'}
+              </span>
             </div>
+            {renderMemberCards(associateCommitteeMembers, setAssociateCommitteeMembers, "Associate Committee")}
+          </div>
+
+          {/* Coordinator Team Section */}
+          <div className="p-24 rounded-16 bg-white mb-24 shadow-xs" style={{ border: "1px solid #eef2f6" }}>
+            <div className="d-flex align-items-center justify-content-between mb-16 flex-wrap gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <div 
+                  className="w-36-px h-36-px rounded-10 d-flex align-items-center justify-content-center flex-shrink-0"
+                  style={{ background: "#eff6ff", color: "#2563eb" }}
+                >
+                  <Icon icon="solar:user-hand-up-bold" style={{ fontSize: "18px" }} />
+                </div>
+                <div>
+                  <h6 className="fw-bold mb-0" style={{ fontSize: "15px", color: "#0f172a" }}>Coordinator Team</h6>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>Coordinators facilitating attendance, events, and chapter growth</span>
+                </div>
+              </div>
+              <span className="badge rounded-pill px-10 py-4 text-xs fw-semibold" style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe" }}>
+                {coordinatorMembers?.length || 0} {(coordinatorMembers?.length === 1) ? 'Member' : 'Members'}
+              </span>
+            </div>
+            {renderMemberCards(coordinatorMembers, setCoordinatorMembers, "Coordinator")}
+          </div>
+
+          {/* Visitor Interaction Team Section */}
+          <div className="p-24 rounded-16 bg-white shadow-xs" style={{ border: "1px solid #eef2f6" }}>
+            <div className="d-flex align-items-center justify-content-between mb-16 flex-wrap gap-2">
+              <div className="d-flex align-items-center gap-2">
+                <div 
+                  className="w-36-px h-36-px rounded-10 d-flex align-items-center justify-content-center flex-shrink-0"
+                  style={{ background: "#faf5ff", color: "#7c3aed" }}
+                >
+                  <Icon icon="solar:user-speak-bold" style={{ fontSize: "18px" }} />
+                </div>
+                <div>
+                  <h6 className="fw-bold mb-0" style={{ fontSize: "15px", color: "#0f172a" }}>Visitor Interaction Team</h6>
+                  <span style={{ fontSize: "12px", color: "#64748b" }}>Members dedicated to welcoming, hosting, and engaging visitors</span>
+                </div>
+              </div>
+              <span className="badge rounded-pill px-10 py-4 text-xs fw-semibold" style={{ background: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }}>
+                {visitorInteractionMembers?.length || 0} {(visitorInteractionMembers?.length === 1) ? 'Member' : 'Members'}
+              </span>
+            </div>
+            {renderMemberCards(visitorInteractionMembers, setVisitorInteractionMembers, "Visitor Interaction Team")}
           </div>
         </div>
 
@@ -1531,9 +1875,10 @@ const ChapterViewLayer = () => {
           <button
             type="button"
             onClick={handleRoleSubmit}
-            className="btn btn-primary fw-bold shadow-sm d-flex align-items-center justify-content-center"
-            style={{ backgroundColor: "rgb(192, 34, 33)", color: "#fff", borderColor: "rgb(192, 34, 33)", padding: "10px 32px", borderRadius: "8px", transition: "all 0.2s ease" }}
+            className="btn btn-primary fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
+            style={{ background: "linear-gradient(135deg, #c02221 0%, #991b1b 100%)", color: "#fff", borderColor: "#c02221", padding: "10px 32px", borderRadius: "8px", transition: "all 0.2s ease" }}
           >
+            <Icon icon="solar:check-read-bold" style={{ fontSize: "18px" }} />
             Save Leadership Roles
           </button>
         </div>
@@ -1562,29 +1907,35 @@ const ChapterViewLayer = () => {
                       <div className="mt-0">
                         {chapter?.members?.map((member, index) => (
                           <div
-                            className={`d-flex align-items-center justify-content-between gap-3 ${index < chapter.members?.length - 1 ? "mb-32" : ""
+                            className={`d-flex align-items-center justify-content-between gap-3 ${index < chapter.members?.length - 1 ? "mb-24" : ""
                               }`}
-                            key={member.id}
+                            key={member.id || index}
                           >
-                            <div className="d-flex align-items-center">
+                            <div className="d-flex align-items-center" style={{ minWidth: 0 }}>
                               <img
-                                src={
-                                  member.image
-                                    ? `${IMAGE_BASE_URL}/${member.image.docPath}/${member.image.docName}`
-                                    : "/assets/images/users/default-user.png"
-                                }
-                                alt={member.name}
-                                className="w-40-px h-40-px rounded-circle flex-shrink-0 me-10 overflow-hidden"
-                              // onError={(e) => {
-                              //   e.target.onerror = null;
-                              //   e.target.src = '/assets/images/users/default-user.png';
-                              // }}
+                                src={getTopAchieverImageUrl(member)}
+                                alt={member.name || "Member"}
+                                className="rounded-circle flex-shrink-0 me-10 object-fit-cover shadow-sm"
+                                style={{
+                                  width: "40px",
+                                  height: "40px",
+                                  minWidth: "40px",
+                                  minHeight: "40px",
+                                  border: "1px solid #e2e8f0",
+                                  backgroundColor: "#f1f5f9"
+                                }}
+                                onError={(e) => {
+                                  e.currentTarget.onerror = null;
+                                  e.currentTarget.src = '/assets/images/default-avatar.png';
+                                }}
                               />
-                              <div className="flex-grow-1">
-                                <h6 className="text-md mb-0">{member.name}</h6>
+                              <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                                <h6 className="text-md mb-0 text-truncate" title={member.name} style={{ color: "#1e293b", fontWeight: 600 }}>
+                                  {member.name}
+                                </h6>
                               </div>
                             </div>
-                            <span className="text-primary-light text-md fw-medium">
+                            <span className="text-primary-light text-md fw-bold flex-shrink-0">
                               {member.score}
                             </span>
                           </div>
@@ -1605,12 +1956,61 @@ const ChapterViewLayer = () => {
 
       {/* PALMS REPORT */}
       <div className="card h-100 p-0 radius-12">
-        <div className="card-header border-bottom bg-base py-16 px-24">
-          <h6 className="text-lg fw-semibold mb-0">PALMS Report</h6>
+        <div className="card-header border-bottom bg-base py-16 px-24 d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div className="d-flex align-items-center gap-3">
+            <h6 className="text-lg fw-semibold mb-0">PALMS Report</h6>
+            {(loadingReports || loadingPalms) && (
+              <div className="d-flex align-items-center gap-2 text-danger text-sm fw-medium">
+                <div className="spinner-border spinner-border-sm text-danger" role="status">
+                  <span className="visually-hidden">Loading...</span>
+                </div>
+                <span>Updating...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Period Filter Buttons */}
+          <div className="d-flex align-items-center gap-1 bg-light p-1 radius-8 border">
+            {PALMS_PERIOD_OPTIONS.map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => {
+                  setPalmsPeriod(opt.key);
+                  fetchPalmsCounts(membersData, opt.key);
+                }}
+                disabled={loadingReports || loadingPalms}
+                className={`btn btn-sm py-1 px-3 radius-6 text-xs fw-semibold transition-2 ${
+                  palmsPeriod === opt.key
+                    ? "btn-danger shadow-sm text-white"
+                    : "btn-outline-transparent text-secondary hover-bg-base"
+                }`}
+                style={{
+                  backgroundColor: palmsPeriod === opt.key ? "rgb(192, 34, 33)" : "transparent",
+                  borderColor: palmsPeriod === opt.key ? "rgb(192, 34, 33)" : "transparent",
+                  fontSize: "12px",
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="card-body chapterwisebox p-24">
-          {membersData?.length > 0 ? (
+          {loadingReports ? (
+            <div className="d-flex flex-column justify-content-center align-items-center py-5" style={{ minHeight: "260px" }}>
+              <div 
+                className="spinner-border text-danger mb-3" 
+                role="status" 
+                style={{ width: "2.75rem", height: "2.75rem", borderWidth: "3px" }}
+              >
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <h6 className="fw-semibold text-secondary mb-1" style={{ fontSize: "15px" }}>Loading PALMS Report</h6>
+              <p className="text-muted text-xs mb-0">Fetching member attendance, referrals, and activity metrics...</p>
+            </div>
+          ) : membersData?.length > 0 ? (
             <>
               {/* TABLE */}
               <div className="table-responsive" style={{ overflowX: "auto" }}>
@@ -1625,7 +2025,6 @@ const ChapterViewLayer = () => {
                       <th>L</th>
                       <th>M</th>
                       <th>S</th>
-                      <th>Events</th>      {/* NEW */}
                       <th>Training</th>    {/* NEW */}
                       <th>One-to-One</th>
                       <th>Referral Given</th>
@@ -1651,15 +2050,7 @@ const ChapterViewLayer = () => {
 
                       // FIX: read correctly from backend structure
                       const meetings = attendanceCounts?.[member._id]?.meeting || defaultCounts;
-                      const events = attendanceCounts?.[member._id]?.event || 0;
                       const training = attendanceCounts?.[member._id]?.training || 0;
-
-                      const totalEvents =
-                        events.present +
-                        events.absent +
-                        events.late +
-                        events.managed +
-                        events.substitute;
 
                       const totalTraining =
                         training.present +
@@ -1686,9 +2077,6 @@ const ChapterViewLayer = () => {
                           <td>{meetings.managed}</td>
                           <td>{meetings.substitute}</td>
 
-                          {/* Events */}
-                          <td>{totalEvents || 0}</td>
-
                           {/* Training */}
                           <td>{totalTraining || 0}</td>
 
@@ -1712,7 +2100,7 @@ const ChapterViewLayer = () => {
                 {/* Prev */}
                 <button
                   className="btn btn-primary"
-                  disabled={pagination.page === 1}
+                  disabled={pagination.page === 1 || loadingReports}
                   onClick={() =>
                     setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
                   }
@@ -1729,7 +2117,7 @@ const ChapterViewLayer = () => {
                 {/* Next */}
                 <button
                   className="btn btn-primary"
-                  disabled={pagination.page === pagination.totalPages}
+                  disabled={pagination.page === pagination.totalPages || loadingReports}
                   onClick={() =>
                     setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
                   }
@@ -1739,7 +2127,9 @@ const ChapterViewLayer = () => {
               </div>
             </>
           ) : (
-            <p>No associates found.</p>
+            <div className="text-center py-4">
+              <p className="text-muted mb-0">No associates found.</p>
+            </div>
           )}
         </div>
       </div>
@@ -1748,10 +2138,30 @@ const ChapterViewLayer = () => {
       <div className="card h-100 p-0 radius-12">
         <div className="card-header border-bottom bg-base py-16 px-24 d-flex justify-content-between align-items-center">
           <h6 className="text-lg fw-semibold mb-0">Associate Performance Report</h6>
+          {loadingReports && (
+            <div className="d-flex align-items-center gap-2 text-danger text-sm fw-medium">
+              <div className="spinner-border spinner-border-sm text-danger" role="status">
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <span>Updating...</span>
+            </div>
+          )}
         </div>
 
         <div className="card-body chapterwisebox p-24">
-          {membersData?.length > 0 ? (
+          {loadingReports ? (
+            <div className="d-flex flex-column justify-content-center align-items-center py-5" style={{ minHeight: "260px" }}>
+              <div 
+                className="spinner-border text-danger mb-3" 
+                role="status" 
+                style={{ width: "2.75rem", height: "2.75rem", borderWidth: "3px" }}
+              >
+                <span className="visually-hidden">Loading...</span>
+              </div>
+              <h6 className="fw-semibold text-secondary mb-1" style={{ fontSize: "15px" }}>Loading Associate Performance Report</h6>
+              <p className="text-muted text-xs mb-0">Calculating 1-to-1s, visitors, trainings, business scores...</p>
+            </div>
+          ) : membersData?.length > 0 ? (
             <>
               {/* TABLE */}
               <div className="table-responsive" style={{ overflowX: "auto" }}>
@@ -1776,8 +2186,7 @@ const ChapterViewLayer = () => {
                       paginatedMembers.map((member, index) => {
                         // Find the associate report for this member
                         const report = associatePerformance?.find(r => r.memberId === member._id) || {};
-                        const key = getPeriodMonthKey();   // ex → "2025-12"
-                        console.log(key, "key")
+                        const key = getPeriodMonthKey();   // ex → "2026-11"
                         const monthData = report?.monthlyScore?.[key] || {};
 
                         const oneToOne = monthData.oneToOne || 0;
@@ -1822,7 +2231,7 @@ const ChapterViewLayer = () => {
                               <div className="progress" style={{ height: "6px" }}>
                                 <div
                                   className="progress-bar bg-success"
-                                  style={{ width: `${(totalScore / 50) * 100}%` }}
+                                  style={{ width: `${Math.min(100, (totalScore / 50) * 100)}%` }}
                                 ></div>
                               </div>
                             </td>
@@ -1845,7 +2254,7 @@ const ChapterViewLayer = () => {
                 {/* Prev */}
                 <button
                   className="btn btn-primary"
-                  disabled={pagination.page === 1}
+                  disabled={pagination.page === 1 || loadingReports}
                   onClick={() =>
                     setPagination((prev) => ({ ...prev, page: prev.page - 1 }))
                   }
@@ -1862,7 +2271,7 @@ const ChapterViewLayer = () => {
                 {/* Next */}
                 <button
                   className="btn btn-primary"
-                  disabled={pagination.page === pagination.totalPages}
+                  disabled={pagination.page === pagination.totalPages || loadingReports}
                   onClick={() =>
                     setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
                   }
@@ -1872,7 +2281,9 @@ const ChapterViewLayer = () => {
               </div>
             </>
           ) : (
-            <p>No associates found.</p>
+            <div className="text-center py-4">
+              <p className="text-muted mb-0">No associates found.</p>
+            </div>
           )}
         </div>
       </div>

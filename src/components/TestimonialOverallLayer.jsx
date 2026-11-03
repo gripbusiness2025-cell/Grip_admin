@@ -14,10 +14,15 @@ const TestimonialOverallLayer = () => {
       setLoading(true);
       const response = await chapterApiProvider.testimonialSlipList();
       console.log(response, "responce-chapterApiProvider");
-      settestimonial(response?.response?.data)
-      // You can set the response to state here if needed
+      const list = Array.isArray(response?.response?.data)
+        ? response.response.data
+        : Array.isArray(response?.response)
+        ? response.response
+        : [];
+      settestimonial(list);
     } catch (error) {
       console.error("Error fetching chapters:", error);
+      settestimonial([]);
     } finally {
       setLoading(false);
     }
@@ -110,8 +115,9 @@ const TestimonialOverallLayer = () => {
         </div> */}
         <div className="card-body chapterwisebox p-24">
           <div className='row gy-4'>
-            {testimonial.map((chapter) => (
-              <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
+            {Array.isArray(testimonial) && testimonial.length > 0 ? (
+              testimonial.map((chapter) => (
+                <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
                 <Link
                   to={`/testimonial-list/${chapter.chapterId}`}
                   className="d-block text-decoration-none"
@@ -186,7 +192,12 @@ const TestimonialOverallLayer = () => {
                   </div>
                 </Link>
               </div>
-            ))}
+            ))
+          ) : (
+            <div className="col-12 text-center text-muted py-5">
+              No chapters or testimonial records found.
+            </div>
+          )}
           </div>
         </div>
       </div>

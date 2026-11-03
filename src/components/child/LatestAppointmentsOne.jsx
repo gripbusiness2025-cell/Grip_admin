@@ -34,8 +34,8 @@ const RecentMembers = () => {
   };
 
   return (
-    <div className="col-xxl-8">
-      <div className="card h-100">
+    <div className="col-xxl-8 col-xl-8 col-12">
+      <div className="card h-100 radius-8 border-0">
         <div className="card-header border-bottom bg-base py-16 px-24 d-flex align-items-center justify-content-between">
           <h6 className="text-lg fw-semibold mb-0">Recent Associates</h6>
           <Link
@@ -50,8 +50,8 @@ const RecentMembers = () => {
           </Link>
         </div>
         <div className="card-body p-0">
-          <div className="table-responsive scroll-sm px-3">
-            <table className="table bordered-table mb-0 rounded-0 border-0">
+          <div className="table-responsive scroll-sm">
+            <table className="table bordered-table mb-0 rounded-0 border-0 text-nowrap">
               <thead>
                 <tr>
                   <th scope="col" className="bg-transparent rounded-0">
@@ -77,17 +77,19 @@ const RecentMembers = () => {
                     <tr key={member._id}>
                       <td>{index + 1}.</td>
                       <td>{member.name}</td>
-                      <td>{member.designation}</td>
-                      <td>{member.companyName}</td>
+                      <td>{member.designation || "N/A"}</td>
+                      <td>{member.companyName || "N/A"}</td>
                       <td>
-                        GRIP {member.chapter} (
-                        {formatMeetingDay(member.meetingDate)})
+                        GRIP {member.chapter || "N/A"}{" "}
+                        {member.meetingDate
+                          ? `(${formatMeetingDay(member.meetingDate)})`
+                          : ""}
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="text-center text-secondary">
+                    <td colSpan="5" className="text-center text-secondary py-24">
                       No recent associates found.
                     </td>
                   </tr>

@@ -1,8 +1,10 @@
 import { Icon } from '@iconify/react/dist/iconify.js';
 import React, { useEffect, useState } from 'react';
+import Modal from 'react-bootstrap/Modal';
 import { useParams, useNavigate } from 'react-router-dom';
 import chapterApiProvider from '../../apiProvider/chapterApi';
-import { hasDeletePermission } from '../../utils/auth';
+import { hasDeletePermission, hasPermission } from '../../utils/auth';
+import { toast, ToastContainer } from 'react-toastify';
 import Swal from 'sweetalert2';
 
 const VisitorFeedbackListLayer = () => {
@@ -17,6 +19,20 @@ const VisitorFeedbackListLayer = () => {
     limit: 10,
     total: 0,
     totalPages: 1,
+  });
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    name: '',
+    mobile: '',
+    email: '',
+    company: '',
+    business: '',
+    joining: '',
+    status: 'Active'
   });
 
   const fetchFeedbackData = async (chapterId) => {
@@ -104,6 +120,58 @@ const VisitorFeedbackListLayer = () => {
       } catch (error) {
         await Swal.fire('Error!', error.message || 'Something went wrong.', 'error');
       }
+    }
+  };
+
+  const handleOpenEdit = (item) => {
+    setEditFormData({
+      id: item._id,
+      name: item.name || '',
+      mobile: item.mobile || '',
+      email: item.email || '',
+      company: item.company || '',
+      business: item.business || item.category || '',
+      joining: item.joining || item.joiningStatus || '',
+      status: item.status || 'Active'
+    });
+    setShowEditModal(true);
+  };
+
+  const handleCloseEdit = () => {
+    setShowEditModal(false);
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingEdit(true);
+    try {
+      const res = await chapterApiProvider.updateVisitorFeedback(editFormData.id, {
+        name: editFormData.name,
+        mobile: editFormData.mobile,
+        email: editFormData.email,
+        company: editFormData.company,
+        business: editFormData.business,
+        category: editFormData.business,
+        joining: editFormData.joining,
+        status: editFormData.status
+      });
+      if (res?.status) {
+        toast.success("Visitor feedback updated successfully");
+        setShowEditModal(false);
+        fetchFeedbackData(id);
+      } else {
+        toast.error(res?.response?.message || "Failed to update feedback");
+      }
+    } catch (err) {
+      console.error("Error updating visitor feedback:", err);
+      toast.error("Failed to update feedback");
+    } finally {
+      setSubmittingEdit(false);
     }
   };
 
@@ -209,16 +277,28 @@ const VisitorFeedbackListLayer = () => {
                         <td className="text-sm text-secondary-light">{inviterName}</td>
 
                         <td>
-                          {hasDeletePermission("visitor-guest-delete") && (
-                            <button
-                              type="button"
-                              className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
-                              onClick={() => deleteFeedbackRecord(item._id)}
-                              title="Delete Feedback Record"
-                            >
-                              <Icon icon="mdi:trash-can-outline" className="menu-icon" />
-                            </button>
-                          )}
+                          <div className="d-flex align-items-center gap-2">
+                            {(hasPermission("visitor-guest-update") || hasPermission("visitor-feedback-update")) && (
+                              <button
+                                type="button"
+                                className="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                onClick={() => handleOpenEdit(item)}
+                                title="Edit"
+                              >
+                                <Icon icon="lucide:edit" className="menu-icon" />
+                              </button>
+                            )}
+                            {hasDeletePermission("visitor-guest-delete") && (
+                              <button
+                                type="button"
+                                className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                onClick={() => deleteFeedbackRecord(item._id)}
+                                title="Delete Feedback Record"
+                              >
+                                <Icon icon="mdi:trash-can-outline" className="menu-icon" />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -301,6 +381,123 @@ const VisitorFeedbackListLayer = () => {
               </div>
             </div>
           )}
+
+          {/* Edit Visitor Feedback Modal */}
+          <Modal show={showEditModal} onHide={handleCloseEdit} centered>
+            <Modal.Header closeButton>
+              <Modal.Title className="text-md fw-semibold">Edit Visitor Feedback</Modal.Title>
+            </Modal.Header>
+            <form onSubmit={handleEditSubmit}>
+              <Modal.Body>
+                <div className="mb-3">
+                  <label className="form-label text-sm fw-medium">Visitor Name</label>
+                  <input
+                    type="text"
+                    name="name"
+                    className="form-control"
+                    value={editFormData.name}
+                    onChange={handleEditChange}
+                    placeholder="Enter visitor name"
+                    required
+                  />
+                </div>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Phone / Mobile</label>
+                    <input
+                      type="tel"
+                      name="mobile"
+                      className="form-control"
+                      value={editFormData.mobile}
+                      onChange={handleEditChange}
+                      placeholder="Enter mobile number"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Email</label>
+                    <input
+                      type="email"
+                      name="email"
+                      className="form-control"
+                      value={editFormData.email}
+                      onChange={handleEditChange}
+                      placeholder="Enter email"
+                    />
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Company Name</label>
+                    <input
+                      type="text"
+                      name="company"
+                      className="form-control"
+                      value={editFormData.company}
+                      onChange={handleEditChange}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Business / Category</label>
+                    <input
+                      type="text"
+                      name="business"
+                      className="form-control"
+                      value={editFormData.business}
+                      onChange={handleEditChange}
+                      placeholder="Enter business category"
+                    />
+                  </div>
+                </div>
+                <div className="row">
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Joining Status</label>
+                    <input
+                      type="text"
+                      name="joining"
+                      className="form-control"
+                      value={editFormData.joining}
+                      onChange={handleEditChange}
+                      placeholder="e.g. Yes, No, Thinking"
+                    />
+                  </div>
+                  <div className="col-md-6 mb-3">
+                    <label className="form-label text-sm fw-medium">Status</label>
+                    <select
+                      name="status"
+                      className="form-select"
+                      value={editFormData.status}
+                      onChange={handleEditChange}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+              </Modal.Body>
+              <Modal.Footer>
+                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCloseEdit}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary grip btn-sm"
+                  disabled={submittingEdit}
+                >
+                  {submittingEdit ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+              </Modal.Footer>
+            </form>
+          </Modal>
+
+          <ToastContainer />
         </div>
       </div>
     </div>

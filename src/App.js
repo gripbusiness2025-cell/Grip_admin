@@ -477,6 +477,7 @@ function App() {
           <Route exact path="/progress" element={<ProgressPage />} />
           <Route exact path="/radio" element={<RadioPage />} />
           <Route exact path="/chapter" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="chapters-list"><RoleAccessPage /></ProtectedRoute>} />
+          <Route exact path="/chapters" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="chapters-list"><RoleAccessPage /></ProtectedRoute>} />
           <Route exact path="/chapter/zone/:zoneId" element={<ProtectedRoute isAuthenticated={isAuthenticated} permission="chapters-list"><RoleAccessPage /></ProtectedRoute>} />
           <Route exact path="/sign-in" element={<SignInPage />} />
           <Route exact path="/sign-up" element={<SignUpPage />} />

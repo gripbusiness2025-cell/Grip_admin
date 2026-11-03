@@ -52,7 +52,7 @@ export const getCurrentUser = () => {
                       || roleNameLower === 'super-admin';
     if (isSuperAdmin) return true;
 
-    // ED → read-only access: can view roles, access-requests, and standard zone-admin permissions
+    // ED → access for Executive Director
     const isED = roleNameLower === 'ed' || roleNameLower === 'executive director';
     if (isED) {
       if (permissionKey.startsWith("admin-users") || permissionKey.startsWith("panel-associate") || permissionKey.startsWith("onboarding-form")) {
@@ -62,14 +62,29 @@ export const getCurrentUser = () => {
         }
         return false;
       }
+
+      // First check if role has explicit permissions assigned in DB
+      const permissions = user?.data?.role?.permissions;
+      if (permissions && Array.isArray(permissions)) {
+        if (permissions.some(p => p.key === permissionKey)) return true;
+      }
+
       const allowedForED = [
         "dashboard-list", "users-list", "users-update", "users-delete", "roles-list",
-        "chapters-list", "chapters-create", "chapters-update", "performers-list", "payments-list", "payments-create",
-        "meeting-list", "meeting-create", "events-list", "events-create", "training-list", "training-create",
-        "121s-list", "referrals-list", "thank-you-slip-list",
-        "testimonial-list", "visitor-guest-list", "expected-visitors-list",
-        "associates-list",
-        "website-list", "website-create", "website-update",
+        "chapters-list", "chapters-create", "chapters-update", "performers-list",
+        "payments-list", "payments-create", "payments-update", "payments-delete",
+        "meeting-list", "meeting-create", "meeting-update", "meeting-delete",
+        "events-list", "events-create", "events-update", "events-delete",
+        "training-list", "training-create", "training-update", "training-delete",
+        "121s-list", "121s-create", "121s-update", "121s-delete",
+        "referrals-list", "referrals-create", "referrals-update", "referrals-delete",
+        "thank-you-slip-list", "thank-you-slip-create", "thank-you-slip-update", "thank-you-slip-delete",
+        "testimonial-list", "testimonial-create", "testimonial-update", "testimonial-delete",
+        "visitor-guest-list", "visitor-guest-create", "visitor-guest-update", "visitor-guest-delete",
+        "expected-visitors-list", "expected-visitors-create", "expected-visitors-update", "expected-visitors-delete",
+        "visitor-feedback-list", "visitor-feedback-create", "visitor-feedback-update", "visitor-feedback-delete",
+        "associates-list", "associates-create", "associates-update", "associates-delete",
+        "website-list", "website-create", "website-update", "website-delete",
       ];
       return allowedForED.includes(permissionKey);
     }
@@ -111,6 +126,11 @@ export const hasDeletePermission = (permissionKey) => {
 
   if (user?.data?.role === 'zone-admin') {
     return false; // Or true depending on if they can delete. Let's return false by default for now unless specified.
+  }
+
+  const isED = roleNameLower === 'ed' || roleNameLower === 'executive director';
+  if (isED) {
+    return hasPermission(permissionKey);
   }
 
   const permissions = user?.data?.role?.permissions;

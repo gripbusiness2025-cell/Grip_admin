@@ -5,7 +5,7 @@ const UnitCountSix = ({countData}) => {
   console.log(countData,"countData");
   return (
     <>
-      <div className='col-xxl-3 col-xl-4 col-sm-6'>
+      <div className='col-xxl-3 col-xl-3 col-sm-6 col-12'>
         <Link to="/zone-list" className="text-decoration-none d-block h-100" style={{ color: 'inherit' }}>
           <div className='card p-3 shadow-2 radius-8 h-100 bg-gradient-end-6' style={{ cursor: 'pointer' }}>
             <div className='card-body p-0'>
@@ -30,7 +30,7 @@ const UnitCountSix = ({countData}) => {
           </div>
         </Link>
       </div>
-      <div className='col-xxl-3 col-xl-4 col-sm-6'>
+      <div className='col-xxl-3 col-xl-3 col-sm-6 col-12'>
         <div className='card p-3 shadow-2 radius-8 h-100 bg-gradient-end-4'>
           <div className='card-body p-0'>
             <div className='d-flex flex-wrap align-items-center justify-content-between gap-1 mb-8'>
@@ -53,7 +53,7 @@ const UnitCountSix = ({countData}) => {
           </div>
         </div>
       </div>
-      <div className='col-xxl-3 col-xl-4 col-sm-6'>
+      <div className='col-xxl-3 col-xl-3 col-sm-6 col-12'>
         <div className='card p-3 shadow-2 radius-8 h-100 bg-gradient-end-1'>
           <div className='card-body p-0'>
             <div className='d-flex flex-wrap align-items-center justify-content-between gap-1 mb-8'>
@@ -76,7 +76,7 @@ const UnitCountSix = ({countData}) => {
           </div>
         </div>
       </div>
-      <div className='col-xxl-3 col-xl-4 col-sm-6'>
+      <div className='col-xxl-3 col-xl-3 col-sm-6 col-12'>
         <div className='card p-3 shadow-2 radius-8 h-100 bg-gradient-end-1'>
           <div className='card-body p-0'>
             <div className='d-flex flex-wrap align-items-center justify-content-between gap-1 mb-8'>

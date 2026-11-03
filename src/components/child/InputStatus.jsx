@@ -4,11 +4,14 @@ import memberApiProvider from '../../apiProvider/memberApi';
 import { Country, State } from 'country-state-city';
 import chapterApiProvider from '../../apiProvider/chapterApi';
 import { toast, ToastContainer } from 'react-toastify';
+import userApiProvider from '../../apiProvider/userApi';
+import { getCurrentUser } from '../../utils/auth';
 
 const InputStatus = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const [isEditMode, setIsEditMode] = useState(false);
+    const [currentUser, setCurrentUser] = useState(() => getCurrentUser()?.data || null);
     const [belongsToOtherOrg, setBelongsToOtherOrg] = useState("");
     const [countries, setCountries] = useState([]);
     const [states, setStates] = useState([]);
@@ -18,6 +21,42 @@ const InputStatus = () => {
     const [loadingChapters, setLoadingChapters] = useState(false);
     const [cids, setCids] = useState([]);
     const [errors, setErrors] = useState({});
+
+    // Role and zone extraction
+    const rawRole = currentUser?.role;
+    const roleName = (typeof rawRole === 'object' ? rawRole?.name : rawRole) || '';
+    const roleNameLower = roleName.toLowerCase();
+    const isSuperAdmin = roleNameLower === 'admin' 
+                      || roleNameLower === 'super admin' 
+                      || roleNameLower === 'super-admin';
+
+    const rawZone = currentUser?.zoneId;
+    const userAssignedZoneId = typeof rawZone === 'object' 
+      ? (rawZone?._id || rawZone?.id) 
+      : (rawZone || (currentUser?.role === 'zone-admin' ? (currentUser?.id || currentUser?._id) : null));
+    const userAssignedZoneName = typeof rawZone === 'object' ? rawZone?.zoneName : null;
+
+    useEffect(() => {
+        const loadUser = async () => {
+            const sessionData = getCurrentUser();
+            const userId = sessionData?.data?.id || sessionData?.data?._id;
+            if (userId) {
+                try {
+                    const res = await userApiProvider.getUserById(userId);
+                    if (res?.status && res?.response?.data) {
+                        setCurrentUser(res.response.data);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Error loading user in InputStatus:", e);
+                }
+            }
+            if (sessionData?.data) {
+                setCurrentUser(sessionData.data);
+            }
+        };
+        loadUser();
+    }, []);
     const [formData, setFormData] = useState({
         chapterInfo: {
             countryName: "",
@@ -102,12 +141,39 @@ const InputStatus = () => {
             }
 
             console.log('Fetching zones for state:', formData.chapterInfo.stateName);
+            setLoadingZones(true);
             try {
                 const response = await chapterApiProvider.getZonesByState(formData.chapterInfo.stateName);
                 console.log('API Response:', response);
                 if (response && response.response && response.response.status) {
-                    console.log('Zones data:', response.response.data);
-                    setZones(response.response.data || []);
+                    let fetchedZones = response.response.data || [];
+
+                    if (!isSuperAdmin && (userAssignedZoneId || userAssignedZoneName)) {
+                        fetchedZones = fetchedZones.filter((z) => {
+                            const zId = String(z._id || z.id || "");
+                            const zName = (z.zoneName || "").trim().toLowerCase();
+                            if (userAssignedZoneId && zId === String(userAssignedZoneId)) return true;
+                            if (userAssignedZoneName && zName === userAssignedZoneName.trim().toLowerCase()) return true;
+                            if (Array.isArray(currentUser?.zoneIds) && currentUser.zoneIds.some(id => String(typeof id === 'object' ? id._id : id) === zId)) return true;
+                            return false;
+                        });
+                    }
+
+                    setZones(fetchedZones);
+
+                    if (fetchedZones.length === 1) {
+                        const singleZone = fetchedZones[0];
+                        setFormData((prev) => ({
+                            ...prev,
+                            chapterInfo: {
+                                ...prev.chapterInfo,
+                                zoneId: singleZone._id,
+                            },
+                        }));
+                        if (typeof getChapters === 'function') {
+                            getChapters(singleZone._id);
+                        }
+                    }
                 } else {
                     console.log('No zones found or error in response');
                     setZones([]);
@@ -120,7 +186,7 @@ const InputStatus = () => {
             }
         };
         fetchZones();
-    }, [formData.chapterInfo.stateName]);
+    }, [formData.chapterInfo.stateName, isSuperAdmin, userAssignedZoneId, userAssignedZoneName]);
 
     useEffect(() => {
         if (id) {
@@ -595,7 +661,14 @@ const InputStatus = () => {
                                 )}
                             </div>
                             <div className="col-4">
-                                <label className="form-label">Zone</label>
+                                <label className="form-label d-flex align-items-center justify-content-between mb-2">
+                                    <span>Zone</span>
+                                    {!isSuperAdmin && (userAssignedZoneName || (zones.length === 1 && zones[0]?.zoneName)) && (
+                                        <span className="badge bg-danger-subtle text-danger px-8 py-2 radius-4 text-xs fw-semibold">
+                                            Assigned: {userAssignedZoneName || zones[0]?.zoneName}
+                                        </span>
+                                    )}
+                                </label>
                                 {loadingZones ? (
                                     <div className="form-control">Loading zones...</div>
                                 ) : (
@@ -604,9 +677,11 @@ const InputStatus = () => {
                                             className="form-control form-select"
                                             value={formData.chapterInfo.zoneId || ""}
                                             onChange={(e) => handleInputChange(e, 'chapterInfo', 'zoneId')}
-                                            disabled={!formData.chapterInfo.stateName || !zones || zones.length === 0}
+                                            disabled={!formData.chapterInfo.stateName || !zones || zones.length === 0 || (!isSuperAdmin && zones.length === 1)}
                                         >
-                                            <option value="">Select Zone</option>
+                                            {(isSuperAdmin || zones.length > 1) && (
+                                                <option value="">Select Zone</option>
+                                            )}
                                             {zones && zones.map((zone) => (
                                                 <option key={zone._id} value={zone._id}>
                                                     {zone.zoneName}

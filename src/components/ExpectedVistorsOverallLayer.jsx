@@ -12,10 +12,15 @@ const ExpectedVisitorsLayer = () => {
   const [loading, setLoading] = useState(true);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  // 1️⃣ Load ALL chapters (empty also needed)
+  // 1️⃣ Load only ACTIVE chapters
   const fetchChapters = async () => {
-    const res = await chapterApiProvider.getAllChapters();
-    setChapters(res?.response?.data || []);
+    const res = await chapterApiProvider.getAllChapters({ isActive: 1, limit: 500 });
+    const rawChapters = res?.response?.data || [];
+    // Only keep active chapters (isActive === 1 or true)
+    const activeChapters = rawChapters.filter(
+      (chapter) => chapter.isActive === 1 || chapter.isActive === "1" || chapter.isActive === true
+    );
+    setChapters(activeChapters);
   };
 
   // 2️⃣ Load expected visitors
@@ -51,23 +56,25 @@ const ExpectedVisitorsLayer = () => {
   }
 
 
-  // 3️⃣ Group visitors by chapterId
-  const groupByChapter = chapters.map((chapter) => {
-    // Get ALL visitors for this chapter
-    const visitors = expectedVisitors.filter(
-      (v) => v.chapterId === chapter._id
-    );
+  // 3️⃣ Group visitors by active chapterId only
+  const groupByChapter = (Array.isArray(chapters) ? chapters : [])
+    .filter((chapter) => chapter.isActive === 1 || chapter.isActive === "1" || chapter.isActive === true)
+    .map((chapter) => {
+      // Get ALL visitors for this chapter
+      const visitors = (Array.isArray(expectedVisitors) ? expectedVisitors : []).filter(
+        (v) => v.chapterId === chapter._id
+      );
 
-    // Filter only active visitors (soft delete = 0)
-    const activeVisitors = visitors.filter((v) => v.isDelete !== 1);
+      // Filter only active visitors (soft delete = 0)
+      const activeVisitors = visitors.filter((v) => v.isDelete !== 1);
 
-    return {
-      chapterId: chapter._id,
-      chapterName: chapter.chapterName,
-      visitors, // OPTIONAL — if you still want raw visitors
-      activeVisitors, // FINAL filtered list
-    };
-  });
+      return {
+        chapterId: chapter._id,
+        chapterName: chapter.chapterName,
+        visitors, // OPTIONAL — if you still want raw visitors
+        activeVisitors, // FINAL filtered list
+      };
+    });
 
   return (
     <>
@@ -177,6 +184,11 @@ const ExpectedVisitorsLayer = () => {
                 </Link>
               </div>
             ))}
+            {groupByChapter.length === 0 && (
+              <div className="col-12 text-center py-5">
+                <span className="text-secondary">No active chapters found.</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

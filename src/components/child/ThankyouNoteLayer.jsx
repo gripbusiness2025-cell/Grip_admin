@@ -4,9 +4,9 @@ import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
 import chapterApiProvider from '../../apiProvider/chapterApi';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import Swal from 'sweetalert2';
-import { hasDeletePermission } from '../../utils/auth';
+import { hasDeletePermission, hasPermission } from '../../utils/auth';
 
 const ThankyouNoteLayer = () => {
     const [showModal, setShowModal] = useState(false);
@@ -23,6 +23,18 @@ const ThankyouNoteLayer = () => {
         limit: 10,
         total: 0,
         totalPages: 1
+    });
+
+    // Edit modal state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [submittingEdit, setSubmittingEdit] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        id: '',
+        amount: '',
+        comments: '',
+        status: 'Active',
+        fromMemberName: '',
+        toMemberName: ''
     });
 
     const handleClose = () => {
@@ -110,6 +122,51 @@ const ThankyouNoteLayer = () => {
         }
     };
 
+    const handleOpenEdit = (item) => {
+        setEditFormData({
+            id: item._id,
+            amount: item.amount !== undefined ? item.amount : '',
+            comments: item.comments || '',
+            status: item.status || 'Active',
+            fromMemberName: item.fromMember?.name || 'N/A',
+            toMemberName: item.toMember?.name || 'N/A'
+        });
+        setShowEditModal(true);
+    };
+
+    const handleCloseEdit = () => {
+        setShowEditModal(false);
+    };
+
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        setEditFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        setSubmittingEdit(true);
+        try {
+            const res = await chapterApiProvider.updateThankYouSlip(editFormData.id, {
+                amount: Number(editFormData.amount),
+                comments: editFormData.comments,
+                status: editFormData.status
+            });
+            if (res?.status) {
+                toast.success("Thank You Slip updated successfully");
+                setShowEditModal(false);
+                fetchChapters(id);
+            } else {
+                toast.error(res?.response?.message || "Failed to update record");
+            }
+        } catch (err) {
+            console.error("Error updating thank you slip:", err);
+            toast.error("Failed to update record");
+        } finally {
+            setSubmittingEdit(false);
+        }
+    };
+
 
 
     const handlePageChange = (newPage) => {
@@ -161,15 +218,28 @@ const ThankyouNoteLayer = () => {
 
 
                                         <td>
-                                            {hasDeletePermission("thank-you-slip-delete") && (
-                                                <button
-                                                    type="button"
-                                                    className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
-                                                    onClick={() => deleteThankYouSlip(item._id)}
-                                                >
-                                                    <Icon icon="mdi:trash-can-outline" className="menu-icon" />
-                                                </button>
-                                            )}
+                                            <div className="d-flex align-items-center gap-2">
+                                                {hasPermission("thank-you-slip-update") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => handleOpenEdit(item)}
+                                                        title="Edit"
+                                                    >
+                                                        <Icon icon="lucide:edit" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                                {hasDeletePermission("thank-you-slip-delete") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => deleteThankYouSlip(item._id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Icon icon="mdi:trash-can-outline" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -254,6 +324,80 @@ const ThankyouNoteLayer = () => {
                                 Close
                             </Button>
                         </Modal.Footer>
+                    </Modal>
+
+                    {/* Edit Thank You Slip Modal */}
+                    <Modal show={showEditModal} onHide={handleCloseEdit} centered>
+                        <Modal.Header closeButton>
+                            <Modal.Title className="text-md fw-semibold">Edit Thank You Slip</Modal.Title>
+                        </Modal.Header>
+                        <form onSubmit={handleEditSubmit}>
+                            <Modal.Body>
+                                <div className="mb-3 p-3 bg-light rounded-8">
+                                    <div className="text-xs text-muted mb-1">Members:</div>
+                                    <div className="d-flex align-items-center justify-content-between">
+                                        <span className="fw-medium text-dark"><span className="text-muted">From:</span> {editFormData.fromMemberName}</span>
+                                        <Icon icon="lucide:arrow-right" className="text-muted mx-2" />
+                                        <span className="fw-medium text-dark"><span className="text-muted">To:</span> {editFormData.toMemberName}</span>
+                                    </div>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-sm fw-medium">Business Value (₹)</label>
+                                    <input
+                                        type="number"
+                                        name="amount"
+                                        className="form-control"
+                                        value={editFormData.amount}
+                                        onChange={handleEditChange}
+                                        placeholder="Enter amount"
+                                        required
+                                        min="0"
+                                    />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-sm fw-medium">Comments</label>
+                                    <textarea
+                                        name="comments"
+                                        className="form-control"
+                                        rows="3"
+                                        value={editFormData.comments}
+                                        onChange={handleEditChange}
+                                        placeholder="Enter comments"
+                                    ></textarea>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-sm fw-medium">Status</label>
+                                    <select
+                                        name="status"
+                                        className="form-select"
+                                        value={editFormData.status}
+                                        onChange={handleEditChange}
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </Modal.Body>
+                            <Modal.Footer>
+                                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCloseEdit}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary grip btn-sm"
+                                    disabled={submittingEdit}
+                                >
+                                    {submittingEdit ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        "Save Changes"
+                                    )}
+                                </button>
+                            </Modal.Footer>
+                        </form>
                     </Modal>
                 </div>
             </div>

@@ -124,18 +124,17 @@ const DashBoardLayer = () => {
           </div>
         </div>
 
-        <div className='col-xxxl-9'>
-          <div className='row gy-4'>
-            <UnitCountSix countData={countData} />
-            <RecentActivityOne />
-          </div>
-        </div>
-        <div className='col-xxxl-3'>
-          <div className='row gy-4'>
-            <TopPerformanceTwo />
-            <RecentMembers />
-          </div>
-        </div>
+        {/* Metric Counter Cards */}
+        <UnitCountSix countData={countData} />
+
+        {/* Recent Associates (Table) */}
+        <RecentMembers />
+
+        {/* Recent Enquiry (List) */}
+        <TopPerformanceTwo />
+
+        {/* Recent Chapters (Table) */}
+        <RecentActivityOne />
       </div>
     </>
   );

@@ -17,7 +17,7 @@ import { Modal } from "bootstrap/dist/js/bootstrap.bundle.min";
 const libraries = ['places'];
 const containerStyle = {
     width: '100%',
-    height: '300px',
+    height: '240px',
     borderRadius: '8px',
     marginTop: '10px'
 };

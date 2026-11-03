@@ -7,7 +7,7 @@ import chapterApiProvider from '../apiProvider/chapterApi';
 import { IMAGE_BASE_URL } from '../network/apiClient';
 import { toast } from 'react-toastify';
 import Swal from 'sweetalert2';
-import { hasDeletePermission } from '../utils/auth';
+import { hasDeletePermission, hasPermission } from '../utils/auth';
 
 const TestimonialLayer = () => {
     const [showModal, setShowModal] = useState(false);
@@ -38,6 +38,17 @@ const TestimonialLayer = () => {
         limit: 10,
         total: 0,
         totalPages: 1,
+    });
+
+    // Edit modal state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [submittingEdit, setSubmittingEdit] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        id: '',
+        comments: '',
+        status: 'Active',
+        fromMemberName: '',
+        toMemberName: ''
     });
 
     // ------------------ FETCH WITH PAGINATION ------------------
@@ -127,6 +138,49 @@ const TestimonialLayer = () => {
         }
     };
 
+    const handleOpenEdit = (item) => {
+        setEditFormData({
+            id: item._id,
+            comments: item.comments || '',
+            status: item.status || 'Active',
+            fromMemberName: item.fromMember?.name || 'N/A',
+            toMemberName: item.toMember?.name || 'N/A'
+        });
+        setShowEditModal(true);
+    };
+
+    const handleCloseEdit = () => {
+        setShowEditModal(false);
+    };
+
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        setEditFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        setSubmittingEdit(true);
+        try {
+            const res = await chapterApiProvider.updateTestimonial(editFormData.id, {
+                comments: editFormData.comments,
+                status: editFormData.status
+            });
+            if (res?.status) {
+                toast.success("Testimonial updated successfully");
+                setShowEditModal(false);
+                fetchChapters(id);
+            } else {
+                toast.error(res?.response?.message || "Failed to update record");
+            }
+        } catch (err) {
+            console.error("Error updating testimonial:", err);
+            toast.error("Failed to update record");
+        } finally {
+            setSubmittingEdit(false);
+        }
+    };
+
     const handleStatusChange = async (status, recordId) => {
         if (!status) return;
         try {
@@ -179,7 +233,7 @@ const TestimonialLayer = () => {
                             <tbody>
                                 {chapterMembers?.records?.map((item, index) => (
                                     <tr key={item._id}>
-                                        <td>{index + 1}.</td>
+                                        <td>{(pagination.page - 1) * pagination.limit + index + 1}.</td>
                                         <td>{new Date(item.createdAt).toLocaleDateString('en-IN')}</td>
 
                                         <td>
@@ -223,15 +277,28 @@ const TestimonialLayer = () => {
 
 
                                         <td>
-                                            {hasDeletePermission("testimonial-delete") && (
-                                                <button
-                                                    type="button"
-                                                    className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
-                                                    onClick={() => deleteTestimonial(item._id)}
-                                                >
-                                                    <Icon icon="mdi:trash-can-outline" className="menu-icon" />
-                                                </button>
-                                            )}
+                                            <div className="d-flex align-items-center gap-2">
+                                                {hasPermission("testimonial-update") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => handleOpenEdit(item)}
+                                                        title="Edit"
+                                                    >
+                                                        <Icon icon="lucide:edit" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                                {hasDeletePermission("testimonial-delete") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => deleteTestimonial(item._id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Icon icon="mdi:trash-can-outline" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -322,6 +389,68 @@ const TestimonialLayer = () => {
                                 })()
                             )}
                         </Modal.Body>
+                    </Modal>
+
+                    {/* Edit Testimonial Modal */}
+                    <Modal show={showEditModal} onHide={handleCloseEdit} centered>
+                        <Modal.Header closeButton>
+                            <Modal.Title className="text-md fw-semibold">Edit Testimonial</Modal.Title>
+                        </Modal.Header>
+                        <form onSubmit={handleEditSubmit}>
+                            <Modal.Body>
+                                <div className="mb-3 p-3 bg-light rounded-8">
+                                    <div className="text-xs text-muted mb-1">Members:</div>
+                                    <div className="d-flex align-items-center justify-content-between">
+                                        <span className="fw-medium text-dark"><span className="text-muted">From:</span> {editFormData.fromMemberName}</span>
+                                        <Icon icon="lucide:arrow-right" className="text-muted mx-2" />
+                                        <span className="fw-medium text-dark"><span className="text-muted">To:</span> {editFormData.toMemberName}</span>
+                                    </div>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-sm fw-medium">Comments / Testimonial Text</label>
+                                    <textarea
+                                        name="comments"
+                                        className="form-control"
+                                        rows="4"
+                                        value={editFormData.comments}
+                                        onChange={handleEditChange}
+                                        placeholder="Enter testimonial text"
+                                        required
+                                    ></textarea>
+                                </div>
+                                <div className="mb-3">
+                                    <label className="form-label text-sm fw-medium">Status</label>
+                                    <select
+                                        name="status"
+                                        className="form-select"
+                                        value={editFormData.status}
+                                        onChange={handleEditChange}
+                                    >
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                    </select>
+                                </div>
+                            </Modal.Body>
+                            <Modal.Footer>
+                                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCloseEdit}>
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="btn btn-primary grip btn-sm"
+                                    disabled={submittingEdit}
+                                >
+                                    {submittingEdit ? (
+                                        <>
+                                            <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                            Saving...
+                                        </>
+                                    ) : (
+                                        "Save Changes"
+                                    )}
+                                </button>
+                            </Modal.Footer>
+                        </form>
                     </Modal>
 
                 </div>

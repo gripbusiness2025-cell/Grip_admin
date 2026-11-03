@@ -14,11 +14,15 @@ const ReferralOverallLayer = () => {
       setLoading(true);
       const response = await chapterApiProvider.refferalList();
       console.log(response, "response");
-      setGripChaptersData(response?.response?.data)
-      // You can set the response to state here if needed
-
+      const list = Array.isArray(response?.response?.data)
+        ? response.response.data
+        : Array.isArray(response?.response)
+        ? response.response
+        : [];
+      setGripChaptersData(list);
     } catch (error) {
       console.error("Error fetching chapters:", error);
+      setGripChaptersData([]);
     } finally {
       setLoading(false);
     }
@@ -108,8 +112,9 @@ const ReferralOverallLayer = () => {
         </div> */}
         <div className="card-body chapterwisebox p-24">
           <div className='row gy-4'>
-            {gripChaptersData.map((chapter) => (
-              <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
+            {Array.isArray(gripChaptersData) && gripChaptersData.length > 0 ? (
+              gripChaptersData.map((chapter) => (
+                <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
                 <Link
                   to={`/referral-list/${chapter.chapterId}`}
                   className="d-block text-decoration-none"
@@ -184,7 +189,12 @@ const ReferralOverallLayer = () => {
                   </div>
                 </Link>
               </div>
-            ))}
+            ))
+          ) : (
+            <div className="col-12 text-center text-muted py-5">
+              No chapters or referral records found.
+            </div>
+          )}
           </div>
         </div>
       </div>

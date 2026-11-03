@@ -94,7 +94,8 @@ const AnalyticsFilterModal = ({ show, onClose, onConfirm, title }) => {
     try {
       setLoadingChapters(true);
       const res = await chapterApiProvider.getChaptersByZone(zoneId);
-      setChapters(res?.response?.data || []);
+      const list = res?.response?.data || [];
+      setChapters(list.filter((ch) => ch.isActive === 1 || ch.isActive === "1" || ch.isActive === true || ch.isActive === undefined));
     } catch (err) {
       console.error('Error fetching chapters by zone:', err);
     } finally {
@@ -105,8 +106,8 @@ const AnalyticsFilterModal = ({ show, onClose, onConfirm, title }) => {
   const fetchPermittedChapters = async () => {
     try {
       setLoadingChapters(true);
-      const res = await chapterApiProvider.getAllChapters({ limit: 500 });
-      const all = res?.response?.data || [];
+      const res = await chapterApiProvider.getAllChapters({ limit: 500, isActive: 1 });
+      const all = (res?.response?.data || []).filter((ch) => ch.isActive === 1 || ch.isActive === "1" || ch.isActive === true);
       if (userChapterIds && userChapterIds.length > 0) {
         setChapters(all.filter(ch =>
           userChapterIds.some(id => String(id) === String(ch._id))

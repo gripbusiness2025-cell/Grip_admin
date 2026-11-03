@@ -1,8 +1,9 @@
 import { Icon } from "@iconify/react/dist/iconify.js";
 import React, { useEffect, useState } from "react";
+import Modal from "react-bootstrap/Modal";
 import { useParams, useNavigate } from "react-router-dom";
 import ExpectedVisitorsApiProvider from "../../apiProvider/ExpectedVisitorsApiProvider";
-import { hasDeletePermission } from "../../utils/auth";
+import { hasDeletePermission, hasPermission } from "../../utils/auth";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Swal from 'sweetalert2';
@@ -23,6 +24,21 @@ const ExpectedVisitorsListLayer = () => {
     limit: 10,
     total: 0,
     totalPages: 1,
+  });
+
+  // Edit modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    id: '',
+    name: '',
+    company: '',
+    category: '',
+    mobile: '',
+    email: '',
+    address: '',
+    visitDate: '',
+    status: 'Active'
   });
 
   const fetchExpectedVisitors = async () => {
@@ -121,6 +137,59 @@ const ExpectedVisitorsListLayer = () => {
   }
 };
 
+  const handleOpenEdit = (item) => {
+    setEditFormData({
+      id: item._id,
+      name: item.name || '',
+      company: item.company || '',
+      category: item.category || '',
+      mobile: item.mobile || '',
+      email: item.email || '',
+      address: item.address || '',
+      visitDate: item.visitDate ? new Date(item.visitDate).toISOString().split('T')[0] : '',
+      status: item.status || 'Active'
+    });
+    setShowEditModal(true);
+  };
+
+  const handleCloseEdit = () => {
+    setShowEditModal(false);
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingEdit(true);
+    try {
+      const res = await ExpectedVisitorsApiProvider.updateExpectedVisitor(editFormData.id, {
+        name: editFormData.name,
+        company: editFormData.company,
+        category: editFormData.category,
+        mobile: editFormData.mobile,
+        email: editFormData.email,
+        address: editFormData.address,
+        visitDate: editFormData.visitDate,
+        status: editFormData.status
+      });
+      if (res?.status) {
+        toast.success("Expected visitor updated successfully");
+        setShowEditModal(false);
+        fetchExpectedVisitors();
+      } else {
+        toast.error(res?.response?.message || "Failed to update visitor");
+      }
+    } catch (err) {
+      console.error("Error updating expected visitor:", err);
+      toast.error("Failed to update visitor");
+    } finally {
+      setSubmittingEdit(false);
+    }
+  };
+
 
 
 
@@ -168,15 +237,28 @@ const ExpectedVisitorsListLayer = () => {
                         {item.invite?.mobile || ""}
                       </td>
                       <td>
-                        {hasDeletePermission("expected-visitors-delete") && (
-                          <button
-                            type="button"
-                            className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
-                            onClick={() => deleteExpectedVisitor(item._id)}
-                          >
-                            <Icon icon="mdi:trash-can-outline" className="menu-icon" />
-                          </button>
-                        )}
+                        <div className="d-flex align-items-center gap-2">
+                          {hasPermission("expected-visitors-update") && (
+                            <button
+                              type="button"
+                              className="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                              onClick={() => handleOpenEdit(item)}
+                              title="Edit"
+                            >
+                              <Icon icon="lucide:edit" className="menu-icon" />
+                            </button>
+                          )}
+                          {hasDeletePermission("expected-visitors-delete") && (
+                            <button
+                              type="button"
+                              className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                              onClick={() => deleteExpectedVisitor(item._id)}
+                              title="Delete"
+                            >
+                              <Icon icon="mdi:trash-can-outline" className="menu-icon" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -261,6 +343,132 @@ const ExpectedVisitorsListLayer = () => {
           )}
         </div>
       </div>
+
+      {/* Edit Expected Visitor Modal */}
+      <Modal show={showEditModal} onHide={handleCloseEdit} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="text-md fw-semibold">Edit Expected Visitor</Modal.Title>
+        </Modal.Header>
+        <form onSubmit={handleEditSubmit}>
+          <Modal.Body>
+            <div className="mb-3">
+              <label className="form-label text-sm fw-medium">Visitor Name</label>
+              <input
+                type="text"
+                name="name"
+                className="form-control"
+                value={editFormData.name}
+                onChange={handleEditChange}
+                placeholder="Enter visitor name"
+                required
+              />
+            </div>
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Company</label>
+                <input
+                  type="text"
+                  name="company"
+                  className="form-control"
+                  value={editFormData.company}
+                  onChange={handleEditChange}
+                  placeholder="Enter company name"
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Category / Business</label>
+                <input
+                  type="text"
+                  name="category"
+                  className="form-control"
+                  value={editFormData.category}
+                  onChange={handleEditChange}
+                  placeholder="Enter category"
+                />
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Mobile</label>
+                <input
+                  type="tel"
+                  name="mobile"
+                  className="form-control"
+                  value={editFormData.mobile}
+                  onChange={handleEditChange}
+                  placeholder="Enter mobile number"
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  className="form-control"
+                  value={editFormData.email}
+                  onChange={handleEditChange}
+                  placeholder="Enter email address"
+                />
+              </div>
+            </div>
+            <div className="row">
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Visit Date</label>
+                <input
+                  type="date"
+                  name="visitDate"
+                  className="form-control"
+                  value={editFormData.visitDate}
+                  onChange={handleEditChange}
+                />
+              </div>
+              <div className="col-md-6 mb-3">
+                <label className="form-label text-sm fw-medium">Status</label>
+                <select
+                  name="status"
+                  className="form-select"
+                  value={editFormData.status}
+                  onChange={handleEditChange}
+                >
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="mb-3">
+              <label className="form-label text-sm fw-medium">Address</label>
+              <input
+                type="text"
+                name="address"
+                className="form-control"
+                value={editFormData.address}
+                onChange={handleEditChange}
+                placeholder="Enter address"
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCloseEdit}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary grip btn-sm"
+              disabled={submittingEdit}
+            >
+              {submittingEdit ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </button>
+          </Modal.Footer>
+        </form>
+      </Modal>
+
       <ToastContainer />
     </div>
   );

@@ -74,6 +74,20 @@ async deleteExpectedVisitor(id) {
   }
 }
 
+  async updateExpectedVisitor(id, data) {
+    try {
+      const response = await apiClient.put(`/expectedvisitors/${id}`, data);
+      if (response.status === 200 || response.status === 201) {
+        return { status: true, response: response.data };
+      } else {
+        return { status: false, response: response.data };
+      }
+    } catch (error) {
+      console.error("Error updating expected visitor:", error);
+      return { status: false, response: error.response?.data ?? null };
+    }
+  }
+
 }
 
 

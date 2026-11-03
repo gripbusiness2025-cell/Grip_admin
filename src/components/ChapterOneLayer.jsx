@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import chapterApiProvider from '../apiProvider/chapterApi';
 import { IMAGE_BASE_URL } from '../network/apiClient';
 import { toast } from 'react-toastify';
-import { hasDeletePermission } from "../utils/auth";
+import { hasDeletePermission, hasPermission } from "../utils/auth";
 import Swal from 'sweetalert2';
 
 const UsersListLayer = () => {
@@ -14,6 +14,19 @@ const UsersListLayer = () => {
     const [selectedImage, setSelectedImage] = useState('');
     const [chapterMembers, setchapterMembers] = useState([]);
     const [accessDenied, setAccessDenied] = useState(false);
+
+    // Edit modal state
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [submittingEdit, setSubmittingEdit] = useState(false);
+    const [editFormData, setEditFormData] = useState({
+        id: '',
+        date: '',
+        whereDidYouMeet: 'in-person',
+        address: '',
+        status: 'Active',
+        fromMemberName: '',
+        toMemberName: ''
+    });
 
     const { id } = useParams();
     const navigate = useNavigate();
@@ -155,6 +168,53 @@ const UsersListLayer = () => {
             } catch (error) {
                 await Swal.fire("Error!", error.message || "Something went wrong.", "error");
             }
+        }
+    };
+
+    const handleOpenEdit = (item) => {
+        setEditFormData({
+            id: item._id,
+            date: item.date ? new Date(item.date).toISOString().split('T')[0] : '',
+            whereDidYouMeet: item.whereDidYouMeet || 'in-person',
+            address: item.address || '',
+            status: item.status || 'Active',
+            fromMemberName: item.fromMember?.name || 'N/A',
+            toMemberName: item.toMember?.name || 'N/A'
+        });
+        setShowEditModal(true);
+    };
+
+    const handleCloseEdit = () => {
+        setShowEditModal(false);
+    };
+
+    const handleEditChange = (e) => {
+        const { name, value } = e.target;
+        setEditFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleEditSubmit = async (e) => {
+        e.preventDefault();
+        setSubmittingEdit(true);
+        try {
+            const res = await chapterApiProvider.updateOneToOne(editFormData.id, {
+                date: editFormData.date,
+                whereDidYouMeet: editFormData.whereDidYouMeet,
+                address: editFormData.address,
+                status: editFormData.status
+            });
+            if (res?.status) {
+                toast.success("121 record updated successfully");
+                setShowEditModal(false);
+                fetchChapters(id);
+            } else {
+                toast.error(res?.response?.message || "Failed to update record");
+            }
+        } catch (err) {
+            console.error("Error updating 121:", err);
+            toast.error("Failed to update record");
+        } finally {
+            setSubmittingEdit(false);
         }
     };
 
@@ -326,15 +386,28 @@ const UsersListLayer = () => {
                                         </td>
 
                                         <td>
-                                            {hasDeletePermission("121s-delete") && (
-                                                <button
-                                                    type="button"
-                                                    className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
-                                                    onClick={() => deleteOneToOne(item._id)}
-                                                >
-                                                    <Icon icon="mdi:trash-can-outline" className="menu-icon" />
-                                                </button>
-                                            )}
+                                            <div className="d-flex align-items-center gap-2">
+                                                {hasPermission("121s-update") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => handleOpenEdit(item)}
+                                                        title="Edit"
+                                                    >
+                                                        <Icon icon="lucide:edit" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                                {hasDeletePermission("121s-delete") && (
+                                                    <button
+                                                        type="button"
+                                                        className="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                        onClick={() => deleteOneToOne(item._id)}
+                                                        title="Delete"
+                                                    >
+                                                        <Icon icon="mdi:trash-can-outline" className="menu-icon" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -418,6 +491,90 @@ const UsersListLayer = () => {
                     <Modal.Body className="text-center">
                         <img src={selectedImage} alt="Profile" className="img-fluid" />
                     </Modal.Body>
+                </Modal>
+
+                {/* Edit 121 Modal */}
+                <Modal show={showEditModal} onHide={handleCloseEdit} centered>
+                    <Modal.Header closeButton>
+                        <Modal.Title className="text-md fw-semibold">Edit 121 Record</Modal.Title>
+                    </Modal.Header>
+                    <form onSubmit={handleEditSubmit}>
+                        <Modal.Body>
+                            <div className="mb-3 p-3 bg-light rounded-8">
+                                <div className="text-xs text-muted mb-1">Participants:</div>
+                                <div className="d-flex align-items-center justify-content-between">
+                                    <span className="fw-medium text-dark"><span className="text-muted">From:</span> {editFormData.fromMemberName}</span>
+                                    <Icon icon="lucide:arrow-right" className="text-muted mx-2" />
+                                    <span className="fw-medium text-dark"><span className="text-muted">To:</span> {editFormData.toMemberName}</span>
+                                </div>
+                            </div>
+                            <div className="mb-3">
+                                <label className="form-label text-sm fw-medium">Date</label>
+                                <input
+                                    type="date"
+                                    name="date"
+                                    className="form-control"
+                                    value={editFormData.date}
+                                    onChange={handleEditChange}
+                                    required
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label className="form-label text-sm fw-medium">Where Did You Meet</label>
+                                <select
+                                    name="whereDidYouMeet"
+                                    className="form-select"
+                                    value={editFormData.whereDidYouMeet}
+                                    onChange={handleEditChange}
+                                >
+                                    <option value="in-person">In Person</option>
+                                    <option value="online">Online</option>
+                                </select>
+                            </div>
+                            <div className="mb-3">
+                                <label className="form-label text-sm fw-medium">Address / Meeting Location</label>
+                                <input
+                                    type="text"
+                                    name="address"
+                                    className="form-control"
+                                    value={editFormData.address}
+                                    onChange={handleEditChange}
+                                    placeholder="Enter address or meeting link"
+                                />
+                            </div>
+                            <div className="mb-3">
+                                <label className="form-label text-sm fw-medium">Status</label>
+                                <select
+                                    name="status"
+                                    className="form-select"
+                                    value={editFormData.status}
+                                    onChange={handleEditChange}
+                                >
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </Modal.Body>
+                        <Modal.Footer>
+                            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={handleCloseEdit}>
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="btn btn-primary grip btn-sm"
+                                disabled={submittingEdit}
+                            >
+                                {submittingEdit ? (
+                                    <>
+                                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    "Save Changes"
+                                )}
+                            </button>
+                        </Modal.Footer>
+                    </form>
                 </Modal>
             </div>
         </div>

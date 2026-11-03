@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import memberApiProvider from "../apiProvider/memberApi";
 import { Country, State } from "country-state-city";
 import chapterApiProvider from "../apiProvider/chapterApi";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import pinApiProvider from "../apiProvider/pinApi";
+import userApiProvider from "../apiProvider/userApi";
+import { getCurrentUser } from "../utils/auth";
 
 const AddPrimaryMemberLayer = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onboardingApp = location.state?.application;
   const [isEditMode, setIsEditMode] = useState(false);
+  const [currentUser, setCurrentUser] = useState(() => getCurrentUser()?.data || null);
   const [belongsToOtherOrg, setBelongsToOtherOrg] = useState("");
   const [countries, setCountries] = useState([]);
   const [states, setStates] = useState([]);
@@ -24,6 +29,43 @@ const AddPrimaryMemberLayer = () => {
   const [pinData, setPinData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Role and zone extraction
+  const rawRole = currentUser?.role;
+  const roleName = (typeof rawRole === 'object' ? rawRole?.name : rawRole) || '';
+  const roleNameLower = roleName.toLowerCase();
+  const isSuperAdmin = roleNameLower === 'admin' 
+                    || roleNameLower === 'super admin' 
+                    || roleNameLower === 'super-admin';
+
+  const rawZone = currentUser?.zoneId;
+  const userAssignedZoneId = typeof rawZone === 'object' 
+    ? (rawZone?._id || rawZone?.id) 
+    : (rawZone || (currentUser?.role === 'zone-admin' ? (currentUser?.id || currentUser?._id) : null));
+  const userAssignedZoneName = typeof rawZone === 'object' ? rawZone?.zoneName : null;
+
+  // Load fresh user data on mount to ensure full zone details are populated
+  useEffect(() => {
+    const loadUser = async () => {
+      const sessionData = getCurrentUser();
+      const userId = sessionData?.data?.id || sessionData?.data?._id;
+      if (userId) {
+        try {
+          const res = await userApiProvider.getUserById(userId);
+          if (res?.status && res?.response?.data) {
+            setCurrentUser(res.response.data);
+            return;
+          }
+        } catch (e) {
+          console.error("Error loading user in AddPrimaryMemberLayer:", e);
+        }
+      }
+      if (sessionData?.data) {
+        setCurrentUser(sessionData.data);
+      }
+    };
+    loadUser();
+  }, []);
 
   // Convert API data to { value, label } for react-select
   const pinOptions = pinData.map((pin) => ({
@@ -48,6 +90,8 @@ const AddPrimaryMemberLayer = () => {
       companyName: "",
       industry: "",
       dob: "",
+      bloodGroup: "",
+      anniversary: "",
       categoryRepresented: "",
       previouslyGRIPMember: "",
       isOtherNetworkingOrgs: "",
@@ -112,6 +156,205 @@ const AddPrimaryMemberLayer = () => {
     }
   }, [formData.chapterInfo.countryName, countries]);
 
+  // Auto-fill from Onboarding Application
+  useEffect(() => {
+    if (!onboardingApp || isEditMode) return;
+
+    // Convert dobDay, dobMonth, dobYear to YYYY-MM-DD
+    let dobFormatted = "";
+    if (onboardingApp.dobDay && onboardingApp.dobMonth && onboardingApp.dobYear) {
+      const monthMap = {
+        jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+        jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
+      };
+      const monthKey = String(onboardingApp.dobMonth).trim().toLowerCase().slice(0, 3);
+      const mStr = monthMap[monthKey] || "01";
+      const dStr = String(onboardingApp.dobDay).padStart(2, "0");
+      dobFormatted = `${onboardingApp.dobYear}-${mStr}-${dStr}`;
+    }
+
+    // Convert anniversaryDay, anniversaryMonth, anniversaryYear to YYYY-MM-DD
+    let anniversaryFormatted = "";
+    if (onboardingApp.anniversaryDay && onboardingApp.anniversaryMonth && onboardingApp.anniversaryYear) {
+      const monthMap = {
+        jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+        jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12"
+      };
+      const monthKey = String(onboardingApp.anniversaryMonth).trim().toLowerCase().slice(0, 3);
+      const mStr = monthMap[monthKey] || "01";
+      const dStr = String(onboardingApp.anniversaryDay).padStart(2, "0");
+      anniversaryFormatted = `${onboardingApp.anniversaryYear}-${mStr}-${dStr}`;
+    }
+
+    // Default renewal date to 1 year from now
+    const nextYear = new Date();
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    const defaultRenewal = nextYear.toISOString().split("T")[0];
+
+    // Determine country & state
+    const allCountries = Country.getAllCountries();
+    const defaultCountry = allCountries.find(
+      (c) => c.name.toLowerCase() === "india" || c.isoCode.toLowerCase() === "in"
+    );
+
+    let stateCode = "TN";
+    if (defaultCountry) {
+      const countryStates = State.getStatesOfCountry(defaultCountry.isoCode);
+      setStates(countryStates);
+      if (onboardingApp.state) {
+        const matchedState = countryStates.find(
+          (s) => s.name?.toLowerCase() === onboardingApp.state.toLowerCase() || s.isoCode?.toLowerCase() === onboardingApp.state.toLowerCase()
+        );
+        if (matchedState) stateCode = matchedState.isoCode;
+      }
+    }
+
+    const zoneId = typeof onboardingApp.zoneId === "object" ? onboardingApp.zoneId?._id : (onboardingApp.zoneId || "");
+    const chapterId = typeof onboardingApp.chapterId === "object" ? onboardingApp.chapterId?._id : (onboardingApp.chapterId || "");
+
+    // Populate zones for state
+    chapterApiProvider.getZonesByState(stateCode).then((res) => {
+      if (res?.response?.status && res?.response?.data) {
+        setZones(res.response.data);
+      }
+    }).catch(console.error);
+
+    // Populate chapters if zone is present
+    if (zoneId) {
+      getChapters(zoneId);
+    }
+
+    const mapYears = (y) => {
+      if (!y) return "";
+      if (y === "0-1" || y.includes("0-1") || y === "below_1_year") return "below_1_year";
+      if (y === "1-3" || y === "3-5" || y === "1_5_years") return "1_5_years";
+      if (y === "5+" || y === "6_10_years") return "6_10_years";
+      if (y === "11_15_years") return "11_15_years";
+      if (y === "above_15_years") return "above_15_years";
+      return y;
+    };
+
+    const mapEducation = (edu) => {
+      if (!edu) return "";
+      if (edu.includes("Diploma")) return "Diploma";
+      if (edu.includes("Bachelor")) return "Bachelor";
+      if (edu.includes("MBA") || edu.includes("Master")) return "MBA";
+      return edu;
+    };
+
+    setBelongsToOtherOrg(onboardingApp.otherNetworking === "Yes");
+
+    setFormData((prev) => ({
+      ...prev,
+      chapterInfo: {
+        ...prev.chapterInfo,
+        countryName: defaultCountry ? defaultCountry.name : "India",
+        stateName: stateCode,
+        zoneId: zoneId || prev.chapterInfo.zoneId,
+        chapterId: chapterId || prev.chapterInfo.chapterId,
+        whoInvitedYou: onboardingApp.invited_by_member || (typeof onboardingApp.invitedBy === "object" ? onboardingApp.invitedBy?.name : "") || "",
+        howDidYouHearAboutGRIP: onboardingApp.hearAbout || "",
+      },
+      personalDetails: {
+        ...prev.personalDetails,
+        firstName: onboardingApp.firstName || "",
+        lastName: onboardingApp.lastName || "",
+        companyName: onboardingApp.companyName || "",
+        industry: onboardingApp.industry || "",
+        dob: dobFormatted || "",
+        bloodGroup: onboardingApp.bloodGroup || "",
+        anniversary: anniversaryFormatted || (onboardingApp.anniversary && onboardingApp.anniversary.includes("-") ? onboardingApp.anniversary : "") || "",
+        categoryRepresented: onboardingApp.category || "",
+        previouslyGRIPMember: onboardingApp.pastAssociate === "Yes",
+        isOtherNetworkingOrgs: onboardingApp.otherNetworking === "Yes",
+        otherNetworkingOrgs: onboardingApp.otherNetworkingOrgs || "",
+        education: mapEducation(onboardingApp.education),
+        renewalDate: defaultRenewal,
+      },
+      businessAddress: {
+        addressLine1: onboardingApp.addressLine1 || "",
+        addressLine2: onboardingApp.addressLine2 || "",
+        city: onboardingApp.city || "",
+        state: onboardingApp.state || "Tamil Nadu",
+        postalCode: onboardingApp.postalCode || "",
+      },
+      contactDetails: {
+        email: onboardingApp.email || "",
+        mobileNumber: onboardingApp.mobile || "",
+        secondaryPhone: onboardingApp.secondaryPhone || "",
+        website: onboardingApp.website || "",
+        gstNumber: onboardingApp.gstNumber || "",
+      },
+      businessDetails: {
+        businessDescription: onboardingApp.businessDetails || "",
+        yearsInBusiness: mapYears(onboardingApp.yearsInBusiness),
+      },
+      businessReferences: [
+        {
+          firstName: onboardingApp.ref1FirstName || "",
+          lastName: onboardingApp.ref1LastName || "",
+          businessName: onboardingApp.ref1BusinessName || "",
+          phoneNumber: onboardingApp.ref1Phone || "",
+          relationship: onboardingApp.ref1Relationship || "",
+          contactSharingGRIP: Boolean(onboardingApp.agreeShareInfo ?? true),
+          contactSharingGRIPReferences: Boolean(onboardingApp.agreeShareInfoRef ?? true),
+        },
+      ],
+      termsAndCertifications: {
+        willAttendMeetingsOnTime: Boolean(onboardingApp.attendMeetings ?? true),
+        willBringVisitors: Boolean(onboardingApp.bringVisitors ?? true),
+        willDisplayPositiveAttitude: Boolean(onboardingApp.positiveAttitude ?? true),
+        understandsContributorsWin: Boolean(onboardingApp.contributorsWin ?? true),
+        willAbideByPolicies: Boolean(onboardingApp.abidePolicies ?? true),
+        willContributeBestAbility: Boolean(onboardingApp.contributeBest ?? true),
+      },
+    }));
+
+    toast.info("Auto-filled available details from Associate Onboarding Application!");
+  }, [onboardingApp, isEditMode]);
+
+  // Auto-fill Country, State & Zone for single-zone restricted users (like Executive Director / Zone Admin)
+  useEffect(() => {
+    if (isEditMode || isSuperAdmin || !currentUser || onboardingApp) return;
+
+    const zoneObj = typeof currentUser.zoneId === 'object' ? currentUser.zoneId : null;
+    if (!zoneObj) return;
+
+    if (countries.length > 0 && !formData.chapterInfo.countryName) {
+      const targetCountry = zoneObj.countryName || "India";
+      const matchedCountry = countries.find(
+        (c) => c.name?.toLowerCase() === targetCountry.toLowerCase() || c.isoCode?.toLowerCase() === targetCountry.toLowerCase()
+      );
+
+      if (matchedCountry) {
+        const countryStates = State.getStatesOfCountry(matchedCountry.isoCode);
+        setStates(countryStates);
+
+        const targetState = zoneObj.stateName || "Tamil Nadu";
+        const matchedState = countryStates.find(
+          (s) => s.name?.toLowerCase() === targetState.toLowerCase() || s.isoCode?.toLowerCase() === targetState.toLowerCase()
+        );
+
+        const stateCode = matchedState ? matchedState.isoCode : (countryStates[0]?.isoCode || "");
+
+        setFormData((prev) => ({
+          ...prev,
+          chapterInfo: {
+            ...prev.chapterInfo,
+            countryName: matchedCountry.name,
+            stateName: stateCode,
+            zoneId: zoneObj._id || prev.chapterInfo.zoneId,
+          },
+        }));
+
+        if (zoneObj._id) {
+          setZones([zoneObj]);
+          getChapters(zoneObj._id);
+        }
+      }
+    }
+  }, [currentUser, isSuperAdmin, isEditMode, countries]);
+
   useEffect(() => {
     const fetchZones = async () => {
       if (!formData.chapterInfo.stateName) {
@@ -121,14 +364,42 @@ const AddPrimaryMemberLayer = () => {
       }
 
       console.log("Fetching zones for state:", formData.chapterInfo.stateName);
+      setLoadingZones(true);
       try {
         const response = await chapterApiProvider.getZonesByState(
           formData.chapterInfo.stateName
         );
         console.log("API Response:", response);
         if (response && response.response && response.response.status) {
-          console.log("Zones data:", response.response.data);
-          setZones(response.response.data || []);
+          let fetchedZones = response.response.data || [];
+
+          // Role-based zone restriction:
+          // If not super admin and user has assigned zone, strictly filter by assigned zone!
+          if (!isSuperAdmin && (userAssignedZoneId || userAssignedZoneName)) {
+            fetchedZones = fetchedZones.filter((z) => {
+              const zId = String(z._id || z.id || "");
+              const zName = (z.zoneName || "").trim().toLowerCase();
+              if (userAssignedZoneId && zId === String(userAssignedZoneId)) return true;
+              if (userAssignedZoneName && zName === userAssignedZoneName.trim().toLowerCase()) return true;
+              if (Array.isArray(currentUser?.zoneIds) && currentUser.zoneIds.some(id => String(typeof id === 'object' ? id._id : id) === zId)) return true;
+              return false;
+            });
+          }
+
+          setZones(fetchedZones);
+
+          // If there is only one zone available (restricted role) and it's not yet selected
+          if (fetchedZones.length === 1) {
+            const singleZone = fetchedZones[0];
+            setFormData((prev) => ({
+              ...prev,
+              chapterInfo: {
+                ...prev.chapterInfo,
+                zoneId: singleZone._id,
+              },
+            }));
+            getChapters(singleZone._id);
+          }
         } else {
           console.log("No zones found or error in response");
           setZones([]);
@@ -141,7 +412,7 @@ const AddPrimaryMemberLayer = () => {
       }
     };
     fetchZones();
-  }, [formData.chapterInfo.stateName]);
+  }, [formData.chapterInfo.stateName, isSuperAdmin, userAssignedZoneId, userAssignedZoneName]);
 
   useEffect(() => {
     if (id) {
@@ -187,6 +458,10 @@ const AddPrimaryMemberLayer = () => {
             dob: data.personalDetails.dob
               ? data.personalDetails.dob.split("T")[0]
               : "",
+            anniversary: data.personalDetails.anniversary
+              ? (data.personalDetails.anniversary.includes("T") ? data.personalDetails.anniversary.split("T")[0] : data.personalDetails.anniversary)
+              : "",
+            bloodGroup: data.personalDetails.bloodGroup || "",
             renewalDate: data.personalDetails.renewalDate?.split("T")[0] || "",
             previouslyGRIPMember: data.personalDetails.previouslyGRIPMember,
           },
@@ -751,8 +1026,15 @@ const AddPrimaryMemberLayer = () => {
                 )}
               </div>
               <div className="col-4">
-                <label className="form-label">
-                  Zone<span className="text-danger">*</span>
+                <label className="form-label d-flex align-items-center justify-content-between mb-2">
+                  <span>
+                    Zone<span className="text-danger">*</span>
+                  </span>
+                  {!isSuperAdmin && (userAssignedZoneName || (zones.length === 1 && zones[0]?.zoneName)) && (
+                    <span className="badge bg-danger-subtle text-danger px-8 py-2 radius-4 text-xs fw-semibold">
+                      Assigned: {userAssignedZoneName || zones[0]?.zoneName}
+                    </span>
+                  )}
                 </label>
                 {loadingZones ? (
                   <div className="form-control">Loading zones...</div>
@@ -767,10 +1049,13 @@ const AddPrimaryMemberLayer = () => {
                       disabled={
                         !formData.chapterInfo.stateName ||
                         !zones ||
-                        zones.length === 0
+                        zones.length === 0 ||
+                        (!isSuperAdmin && zones.length === 1)
                       }
                     >
-                      <option value="">Select Zone</option>
+                      {(isSuperAdmin || zones.length > 1) && (
+                        <option value="">Select Zone</option>
+                      )}
                       {zones &&
                         zones.map((zone) => (
                           <option key={zone._id} value={zone._id}>
@@ -1005,6 +1290,55 @@ const AddPrimaryMemberLayer = () => {
                   <div className="">
                     <span className="text-danger">
                       {errors.personalDetails.categoryRepresented}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="col-6">
+                <label className="form-label">
+                  Blood Group
+                </label>
+                <select
+                  className="form-control form-select border"
+                  value={formData.personalDetails.bloodGroup || ""}
+                  onChange={(e) =>
+                    handleInputChange(e, "personalDetails", "bloodGroup")
+                  }
+                >
+                  <option value="">Select Blood Group</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                </select>
+                {errors.personalDetails?.bloodGroup && (
+                  <div className="">
+                    <span className="text-danger">
+                      {errors.personalDetails.bloodGroup}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="col-6">
+                <label className="form-label">
+                  Anniversary Date
+                </label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={formData.personalDetails.anniversary || ""}
+                  onChange={(e) =>
+                    handleInputChange(e, "personalDetails", "anniversary")
+                  }
+                />
+                {errors.personalDetails?.anniversary && (
+                  <div className="">
+                    <span className="text-danger">
+                      {errors.personalDetails.anniversary}
                     </span>
                   </div>
                 )}

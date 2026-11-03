@@ -17,9 +17,15 @@ const OnetoOneLayer = () => {
       setLoading(true);
       const response = await chapterApiProvider.onetooneSlipList();
       console.log(response, "responce-chapterApiProvider");
-      setonetoone(response?.response?.data)
+      const list = Array.isArray(response?.response?.data)
+        ? response.response.data
+        : Array.isArray(response?.response)
+        ? response.response
+        : [];
+      setonetoone(list);
     } catch (error) {
       console.error("Error fetching chapters:", error);
+      setonetoone([]);
     } finally {
       setLoading(false);
     }
@@ -112,8 +118,9 @@ const OnetoOneLayer = () => {
         </div> */}
         <div className="card-body chapterwisebox p-24">
           <div className='row gy-4'>
-            {onetoone?.map((chapter) => (
-              <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
+            {Array.isArray(onetoone) && onetoone.length > 0 ? (
+              onetoone.map((chapter) => (
+                <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
                 <Link
                   to={`/chapterone-list/${chapter.chapterId}`}
                   className="d-block text-decoration-none"
@@ -188,7 +195,12 @@ const OnetoOneLayer = () => {
                   </div>
                 </Link>
               </div>
-            ))}
+            ))
+          ) : (
+            <div className="col-12 text-center text-muted py-5">
+              No chapters or 121 records found.
+            </div>
+          )}
           </div>
         </div>
       </div>

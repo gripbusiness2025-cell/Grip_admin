@@ -229,3 +229,95 @@ table.dataTable td.dt-type-date {
 .text-nowrap {
   white-space: nowrap !important;
 }
+
+/* SweetAlert2 Select dropdown styling (box + dropdown arrow) */
+.swal2-popup select.swal2-select,
+div:where(.swal2-container) select:where(.swal2-select),
+.swal2-select-custom {
+  display: block !important;
+  width: 80% !important;
+  max-width: 320px !important;
+  margin: 1.25rem auto !important;
+  padding: 0.625rem 2.5rem 0.625rem 1rem !important;
+  font-size: 0.95rem !important;
+  font-weight: 500 !important;
+  line-height: 1.5 !important;
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 1rem center !important;
+  background-size: 16px 12px !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  outline: none !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  cursor: pointer !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out !important;
+}
+
+.swal2-popup select.swal2-select:focus,
+div:where(.swal2-container) select:where(.swal2-select):focus,
+.swal2-select-custom:focus {
+  border-color: #c02221 !important;
+  box-shadow: 0 0 0 3px rgba(192, 34, 33, 0.15) !important;
+}
+
+[data-theme="dark"] .swal2-popup select.swal2-select,
+[data-theme="dark"] div:where(.swal2-container) select:where(.swal2-select),
+[data-theme="dark"] .swal2-select-custom {
+  background-color: #1f2937 !important;
+  color: #f3f4f6 !important;
+  border-color: #4b5563 !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23d1d5db' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+/* SweetAlert2 action buttons in Update Status */
+.swal2-actions-custom {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  justify-content: center !important;
+  margin-top: 1.5rem !important;
+}
+
+.swal2-actions-custom button {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 0.625rem 1.25rem !important;
+  font-size: 0.9375rem !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.swal2-actions-custom .swal2-deny.swal2-deny-custom {
+  background-color: #c02221 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(192, 34, 33, 0.2) !important;
+}
+
+.swal2-actions-custom .swal2-deny.swal2-deny-custom:hover {
+  background-color: #a81c1b !important;
+}
+
+.swal2-actions-custom .swal2-confirm {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2) !important;
+}
+
+.swal2-actions-custom .swal2-confirm:hover {
+  background-color: #15803d !important;
+}
+
+.swal2-actions-custom .swal2-cancel {
+  background-color: #6c757d !important;
+  color: #ffffff !important;
+}
+
+.swal2-actions-custom .swal2-cancel:hover {
+  background-color: #5a6268 !important;
+}
+

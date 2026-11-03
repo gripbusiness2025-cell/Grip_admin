@@ -14,11 +14,15 @@ const VisitorOverallLayer = () => {
       setLoading(true);
       const response = await chapterApiProvider.visitorsSlipList();
       console.log(response, "responce-chapterApiProvider");
-      setVisitors(response?.response?.data)
-      // You can set the response to state here if needed
+      const list = Array.isArray(response?.response?.data)
+        ? response.response.data
+        : Array.isArray(response?.response)
+        ? response.response
+        : [];
+      setVisitors(list);
     } catch (error) {
       console.error("Error fetching chapters:", error);
-      // Handle the error (e.g., show error message to user)
+      setVisitors([]);
     } finally {
       setLoading(false);
     }
@@ -111,83 +115,89 @@ const VisitorOverallLayer = () => {
         {/* </div> */}
         <div className="card-body chapterwisebox p-24">
           <div className='row gy-4'>
-            {visitors.map((chapter) => (
-              <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
-                <Link
-                  to={`/visitors-list/${chapter.chapterId}`}
-                  className="d-block text-decoration-none"
-                  style={{ transition: 'all 0.3s ease' }}
-                >
-                  <div 
-                    className="card border-0 overflow-hidden" 
-                    style={{
-                      background: 'linear-gradient(135deg, #c02221 0%, #454442 100%)',
-                      borderRadius: '16px',
-                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-                      transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                      cursor: 'pointer'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-6px)';
-                      e.currentTarget.style.boxShadow = '0 12px 24px rgba(192, 34, 33, 0.25)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
-                    }}
+            {Array.isArray(visitors) && visitors.length > 0 ? (
+              visitors.map((chapter) => (
+                <div className="col-xxl-4 col-md-6 col-sm-12" key={chapter.chapterId}>
+                  <Link
+                    to={`/visitors-list/${chapter.chapterId}`}
+                    className="d-block text-decoration-none"
+                    style={{ transition: 'all 0.3s ease' }}
                   >
-                    <div className="p-24 d-flex align-items-center justify-content-between">
-                      <div>
-                        <span style={{ 
-                          fontSize: '11px', 
-                          textTransform: 'uppercase', 
-                          letterSpacing: '1.5px', 
-                          color: 'rgba(255, 255, 255, 0.6)',
-                          fontWeight: '600',
-                          display: 'block',
-                          marginBottom: '4px'
-                        }}>
-                          Chapter
-                        </span>
-                        <h5 className="fw-bold text-white mb-0" style={{ fontSize: '22px', letterSpacing: '0.5px' }}>
-                          {chapter.chapterName}
-                        </h5>
-                        <span style={{ 
-                          fontSize: '13px', 
-                          color: 'rgba(255, 255, 255, 0.75)',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          marginTop: '8px',
-                          gap: '6px',
-                          textTransform: 'uppercase',
-                          fontWeight: '600'
-                        }}>
-                          VIEW PERFORMERS
-                          <Icon icon="solar:arrow-right-linear" style={{ fontSize: '14px' }} />
-                          <Icon icon="solar:users-group-rounded-linear" style={{ fontSize: '20px', opacity: 0.3, marginLeft: '2px' }} />
-                        </span>
-                      </div>
-                      <div 
-                        className="d-flex align-items-center justify-content-center"
-                        style={{
-                          background: '#ffffff',
-                          color: '#c02221',
-                          width: '56px',
-                          height: '56px',
-                          borderRadius: '50%',
-                          fontWeight: '700',
-                          fontSize: '18px',
-                          boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
-                          flexShrink: 0
-                        }}
-                      >
-                        {chapter.overallChapterCount ?? 0}
+                    <div 
+                      className="card border-0 overflow-hidden" 
+                      style={{
+                        background: 'linear-gradient(135deg, #c02221 0%, #454442 100%)',
+                        borderRadius: '16px',
+                        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+                        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-6px)';
+                        e.currentTarget.style.boxShadow = '0 12px 24px rgba(192, 34, 33, 0.25)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.08)';
+                      }}
+                    >
+                      <div className="p-24 d-flex align-items-center justify-content-between">
+                        <div>
+                          <span style={{ 
+                            fontSize: '11px', 
+                            textTransform: 'uppercase', 
+                            letterSpacing: '1.5px', 
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            fontWeight: '600',
+                            display: 'block',
+                            marginBottom: '4px'
+                          }}>
+                            Chapter
+                          </span>
+                          <h5 className="fw-bold text-white mb-0" style={{ fontSize: '22px', letterSpacing: '0.5px' }}>
+                            {chapter.chapterName}
+                          </h5>
+                          <span style={{ 
+                            fontSize: '13px', 
+                            color: 'rgba(255, 255, 255, 0.75)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            marginTop: '8px',
+                            gap: '6px',
+                            textTransform: 'uppercase',
+                            fontWeight: '600'
+                          }}>
+                            VIEW PERFORMERS
+                            <Icon icon="solar:arrow-right-linear" style={{ fontSize: '14px' }} />
+                            <Icon icon="solar:users-group-rounded-linear" style={{ fontSize: '20px', opacity: 0.3, marginLeft: '2px' }} />
+                          </span>
+                        </div>
+                        <div 
+                          className="d-flex align-items-center justify-content-center"
+                          style={{
+                            background: '#ffffff',
+                            color: '#c02221',
+                            width: '56px',
+                            height: '56px',
+                            borderRadius: '50%',
+                            fontWeight: '700',
+                            fontSize: '18px',
+                            boxShadow: '0 4px 10px rgba(0,0,0,0.15)',
+                            flexShrink: 0
+                          }}
+                        >
+                          {chapter.overallChapterCount ?? 0}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </div>
+              ))
+            ) : (
+              <div className="col-12 text-center text-muted py-5">
+                No chapters or visitor records found.
               </div>
-            ))}
+            )}
           </div>
         </div>
       </div>

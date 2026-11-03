@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import OnboardingApi from "../apiProvider/OnboardingApi";
 import ReactPaginate from 'react-paginate';
 import { Icon } from '@iconify/react';
@@ -9,6 +10,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 const OnboardingListLayer = () => {
+    const navigate = useNavigate();
     const [applications, setApplications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showViewModal, setShowViewModal] = useState(false);
@@ -43,7 +45,7 @@ const OnboardingListLayer = () => {
     };
 
     const handleEditStatus = async (app) => {
-        const { value: status } = await Swal.fire({
+        const result = await Swal.fire({
             title: 'Update Status',
             input: 'select',
             inputOptions: {
@@ -53,10 +55,39 @@ const OnboardingListLayer = () => {
             },
             inputValue: app.status,
             showCancelButton: true,
-            confirmButtonText: 'Update'
+            showDenyButton: true,
+            confirmButtonText: 'Update',
+            denyButtonText: 'Add as Associate',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#16a34a',
+            denyButtonColor: '#c02221',
+            cancelButtonColor: '#6c757d',
+            customClass: {
+                input: 'swal2-select-custom',
+                actions: 'swal2-actions-custom',
+                denyButton: 'swal2-deny-custom'
+            },
+            preDeny: () => {
+                return Swal.getInput()?.value || app.status;
+            }
         });
 
-        if (status && status !== app.status) {
+        if (result.isDenied) {
+            const currentSelected = result.value || app.status;
+            if (currentSelected && currentSelected !== app.status) {
+                try {
+                    await OnboardingApi.updateApplicationStatus(app._id, currentSelected);
+                    fetchApplications();
+                } catch (e) {
+                    console.error("Error auto-updating status:", e);
+                }
+            }
+            navigate('/add-primarymember', { state: { application: { ...app, status: currentSelected } } });
+            return;
+        }
+
+        const status = result.value;
+        if (result.isConfirmed && status && status !== app.status) {
             setLoading(true);
             const res = await OnboardingApi.updateApplicationStatus(app._id, status);
             if (res.status && res.response.success) {
@@ -186,6 +217,14 @@ const OnboardingListLayer = () => {
                                                 >
                                                     <Icon icon="majesticons:eye-line" className="icon text-xl" />
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    className="bg-primary-focus bg-hover-primary-200 text-primary-600 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                                                    title="Add as Associate"
+                                                    onClick={() => navigate('/add-primarymember', { state: { application: app } })}
+                                                >
+                                                    <Icon icon="lucide:user-plus" className="icon text-xl" />
+                                                </button>
                                                 {hasPermission('onboarding-form-update') && (
                                                     <button
                                                         type="button"
@@ -263,6 +302,9 @@ const OnboardingListLayer = () => {
                             <div className="col-md-6"><strong>Last Name:</strong> {selectedApp.lastName}</div>
                             <div className="col-md-6"><strong>Company Name:</strong> {selectedApp.companyName}</div>
                             <div className="col-md-6"><strong>Category:</strong> {selectedApp.category}</div>
+                            <div className="col-md-6"><strong>Blood Group:</strong> {selectedApp.bloodGroup || 'N/A'}</div>
+                            <div className="col-md-6"><strong>Date of Birth:</strong> {selectedApp.dobDay ? `${selectedApp.dobDay} ${selectedApp.dobMonth} ${selectedApp.dobYear}` : 'N/A'}</div>
+                            <div className="col-md-6"><strong>Anniversary Date:</strong> {selectedApp.anniversary || (selectedApp.anniversaryDay ? `${selectedApp.anniversaryDay} ${selectedApp.anniversaryMonth} ${selectedApp.anniversaryYear}` : 'N/A')}</div>
                             <div className="col-md-6"><strong>Mobile:</strong> {selectedApp.mobile}</div>
                             <div className="col-md-6"><strong>Email:</strong> {selectedApp.email}</div>
                             <div className="col-md-6"><strong>Chapter:</strong> {selectedApp.chapterName || selectedApp.chapterId?.chapterName}</div>
@@ -321,6 +363,15 @@ const OnboardingListLayer = () => {
                     )}
                 </Modal.Body>
                 <Modal.Footer>
+                    <Button 
+                        variant="success" 
+                        onClick={() => {
+                            setShowViewModal(false);
+                            navigate('/add-primarymember', { state: { application: selectedApp } });
+                        }}
+                    >
+                        <Icon icon="lucide:user-plus" className="me-1" /> Add as Associate
+                    </Button>
                     <Button variant="primary" onClick={handleDownloadPDF}>Download PDF</Button>
                     <Button variant="secondary" onClick={() => setShowViewModal(false)}>Close</Button>
                 </Modal.Footer>

@@ -768,11 +768,13 @@ async submitHeadTableRoles(chapterId, payload) {
         }
     }
 
-    async getMembersAttendanceCount(memberIds) {
+    async getMembersAttendanceCount(memberIds, dateFilter = {}) {
         try {
             console.log(memberIds, "memberId")
             const response = await apiClient.post('/members/meetings-attendance-count', {
-                members: memberIds
+                members: memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
             });
 
             if (response.status === 200 || response.status === 201) {
@@ -788,10 +790,12 @@ async submitHeadTableRoles(chapterId, payload) {
     }
 
     // memberApiProvider.ts
-    async getOneToOneCounts(memberIds) {
+    async getOneToOneCounts(memberIds, dateFilter = {}) {
         try {
             const response = await apiClient.post('/members/one-to-one-count', {
                 memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
             });
 
             if (response.status === 200 || response.status === 201) {
@@ -825,10 +829,12 @@ async submitHeadTableRoles(chapterId, payload) {
     }
 
 
-    async getReferralCounts(memberIds) {
+    async getReferralCounts(memberIds, dateFilter = {}) {
         try {
             const response = await apiClient.post('/members/referral-count', {
                 memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
             });
 
             if (response.status === 200 || response.status === 201) {
@@ -861,9 +867,13 @@ async submitHeadTableRoles(chapterId, payload) {
         }
     }
 
-    async getThankYouSlipAmounts(memberIds) {
+    async getThankYouSlipAmounts(memberIds, dateFilter = {}) {
         try {
-            const response = await apiClient.post('/members/thank-you-slip-amounts', { memberIds });
+            const response = await apiClient.post('/members/thank-you-slip-amounts', {
+                memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
+            });
 
             if (response.status === 200 || response.status === 201) {
                 return { success: true, data: response.data.data };
@@ -878,9 +888,13 @@ async submitHeadTableRoles(chapterId, payload) {
     }
 
     // memberApiProvider.ts
-    async getVisitorCounts(memberIds) {
+    async getVisitorCounts(memberIds, dateFilter = {}) {
         try {
-            const response = await apiClient.post('/members/visitor-count', { memberIds });
+            const response = await apiClient.post('/members/visitor-count', {
+                memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
+            });
 
             if (response.status === 200 || response.status === 201) {
                 return { success: true, data: response.data.data };
@@ -897,10 +911,12 @@ async submitHeadTableRoles(chapterId, payload) {
 
 
     // memberApiProvider.ts
-    async getTestimonialCounts(memberIds) {
+    async getTestimonialCounts(memberIds, dateFilter = {}) {
         try {
             const response = await apiClient.post('/members/testimonial-counts', {
                 memberIds,
+                startDate: dateFilter?.startDate,
+                endDate: dateFilter?.endDate,
             });
 
             if (response.status === 200 || response.status === 201) {
@@ -995,6 +1011,104 @@ async submitHeadTableRoles(chapterId, payload) {
             if (error.response && error.response.status === 401) {
                 console.error('Unauthorized access - check your token.');
             }
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateOneToOne(id, data) {
+        try {
+            const response = await apiClient.put(`/onetoone/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating One-to-One record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateReferralSlip(id, data) {
+        try {
+            const response = await apiClient.put(`/referralslip/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Referral Slip record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateThankYouSlip(id, data) {
+        try {
+            const response = await apiClient.put(`/thankyouslips/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Thank You Slip record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateTestimonial(id, data) {
+        try {
+            const response = await apiClient.put(`/testimonialslips/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Testimonial record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateVisitor(id, data) {
+        try {
+            const response = await apiClient.put(`/visitors/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Visitor record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateExpectedVisitor(id, data) {
+        try {
+            const response = await apiClient.put(`/expectedvisitors/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Expected Visitor record:", error);
+            return { status: false, response: error.response?.data ?? null };
+        }
+    }
+
+    async updateVisitorFeedback(id, data) {
+        try {
+            const response = await apiClient.put(`/visitor-feedbacks/${id}`, data);
+            if (response.status === 200 || response.status === 201) {
+                return { status: true, response: response.data };
+            } else {
+                return { status: false, response: response.data };
+            }
+        } catch (error) {
+            console.error("Error updating Visitor Feedback record:", error);
             return { status: false, response: error.response?.data ?? null };
         }
     }
