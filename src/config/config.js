@@ -5,13 +5,13 @@ const config = {
     apiUrl: process.env.REACT_APP_API_URL || 'http://localhost:4002/api/admin',
     imageBaseUrl: process.env.REACT_APP_IMAGE_URL || 'http://localhost:4002/api/public/',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'AIzaSyDguUg1AoVbNpnY8J6F9dLV3PeLkBEYyCw',
-    debug: true
+    debug: false
   },
   production: {
     apiUrl: process.env.REACT_APP_API_URL || 'https://api.gripforum.com/api/admin',
     imageBaseUrl: process.env.REACT_APP_IMAGE_URL || 'https://api.gripforum.com/api/public/',
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || 'AIzaSyDguUg1AoVbNpnY8J6F9dLV3PeLkBEYyCw',
-    debug: false
+    debug: true
   }
 };
 
